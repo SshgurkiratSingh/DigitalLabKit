@@ -1,36 +1,139 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# IC Testing Interface
 
-## Getting Started
+A web-based interface for testing and controlling integrated circuits (ICs) through a serial connection.
 
-First, run the development server:
+## Features
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+- Direct IC selection without category navigation
+- Real-time pin state visualization and control
+- Serial communication with automatic reconnection
+- Debug logging for serial data and actions
+- Supports 14-16 pin ICs
+- Automatic IC detection and configuration
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Serial Protocol
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Commands from Device to Interface
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+1. IC Selection:
+   ```
+   IC:7400
+   ```
+   - Automatically updates the selected IC in the interface
+   - Numbers 7400-7499 are supported
+   - Interface will request pin states after IC selection
 
-## Learn More
+2. Pin States:
+   ```
+   1010101010101010
+   ```
+   - 14-16 bit binary string
+   - Each bit represents the state of a pin (1=HIGH, 0=LOW)
+   - Bits are ordered from pin 1 to pin 14/16
+   - No prefix needed, just raw binary data
 
-To learn more about Next.js, take a look at the following resources:
+3. Error Messages:
+   ```
+   ERROR:message
+   ```
+   - Reports errors from the device
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+4. Sync Response:
+   ```
+   SYNC:OK
+   ```
+   - Response to sync request from interface
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+### Commands from Interface to Device
 
-## Deploy on Vercel
+1. Pin State Changes:
+   ```
+   1010101010101010
+   ```
+   - 14-16 bit binary string
+   - Each bit represents desired pin state
+   - Only changed bits are updated, others maintain previous state
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+2. Sync Request:
+   ```
+   SYNC
+   ```
+   - Sent periodically to check device connection
+   - Also sent when manual sync is requested
+   - Device should respond with SYNC:OK
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+3. Pin State Request:
+   ```
+   PINS?
+   ```
+   - Requests current pin states from device
+   - Device should respond with binary pin state data
+
+## Interface Features
+
+1. IC Selection:
+   - Direct list of all supported ICs
+   - Search by part number or description
+   - Automatic update when device sends IC selection
+
+2. Pin Visualization:
+   - Color-coded pin states
+   - Interactive pin state control
+   - Real-time updates from device
+
+3. Debug Log:
+   - Timestamps for all events
+   - Color-coded message types
+   - Sent and received data logging
+   - Error reporting
+   - Manual sync request button
+
+4. Connection Management:
+   - Automatic port detection
+   - Connection status indicator
+   - Automatic reconnection attempts
+   - Manual connect/disconnect control
+
+## Requirements
+
+- Browser with Web Serial API support (Chrome, Edge, or Opera)
+- Serial device configured for:
+  - Baud rate: 115200
+  - Data bits: 8
+  - Stop bits: 1
+  - No parity
+  - No flow control
+
+## Development
+
+1. Install dependencies:
+   ```bash
+   npm install
+   ```
+
+2. Run development server:
+   ```bash
+   npm run dev
+   ```
+
+3. Build for production:
+   ```bash
+   npm run build
+   ```
+
+## Error Handling
+
+1. Connection Errors:
+   - Automatic reconnection attempts (max 3)
+   - Error logging in debug panel
+   - Visual connection status indicator
+
+2. Data Validation:
+   - Pin count validation (14-16 pins)
+   - Binary data format validation
+   - IC part number validation
+
+3. Command Timeouts:
+   - 100ms timeout for incomplete commands
+   - Buffer clearing on timeout
+   - Timeout events logged in debug panel

@@ -404,28 +404,13 @@ export default function SerialPortInterface({
       const completeLines = lines.slice(0, -1); // All but the last (incomplete) line
       const remainingBuffer = lines[lines.length - 1]; // The incomplete line
 
-      // Only process the LAST complete line (final command)
-      if (completeLines.length > 0) {
-        const finalCommand = completeLines[completeLines.length - 1].trim();
-        if (finalCommand) {
-          processCommand(finalCommand);
+      // Process complete lines
+      completeLines.forEach((line) => {
+        const trimmedLine = line.trim();
+        if (trimmedLine) {
+          processCommand(trimmedLine);
         }
-
-        // Log any skipped commands for debugging
-        if (completeLines.length > 1) {
-          const skippedCommands = completeLines.slice(0, -1);
-          setDebugLogs((prev) => [
-            ...prev,
-            {
-              timestamp: new Date().toISOString(),
-              type: "info",
-              message: `Skipped ${
-                skippedCommands.length
-              } intermediate commands: [${skippedCommands.join(", ")}]`,
-            },
-          ]);
-        }
-      }
+      });
 
       // Update buffer with remaining incomplete data
       commandBufferRef.current = remainingBuffer;
@@ -434,9 +419,9 @@ export default function SerialPortInterface({
       lastCommandTimeRef.current = Date.now();
     }
   };
+
   // Process a complete command
   const processCommand = (command: string) => {
-    console.log("Processing command:", command);
     // Add to debug log
     const logEntry = {
       timestamp: new Date().toISOString(),
@@ -448,7 +433,6 @@ export default function SerialPortInterface({
     try {
       // Parse IC selection from the received data
       if (command.startsWith("IC:")) {
-        console.log("Processing IC command:", command);
         const icNumber = command.substring(3).trim();
         // Extract initial numeric part from received IC number
         const numericPart = icNumber.match(/^\d+/)?.[0];

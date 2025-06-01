@@ -28,21 +28,11 @@ export default function ICVisualizer({
   onPinStateChange,
   serialConnected,
 }: ICVisualizerProps) {
-  const [pinStates, setPinStates] = useState<{ [key: number]: boolean }>({});
-
-  useEffect(() => {
-    // Reset pin states when IC changes
-    if (ic) {
-      const initialStates: { [key: number]: boolean } = {};
-      ic.pinConfiguration.forEach((pin) => {
-        initialStates[pin.pin] = false;
-      });
-      setPinStates(initialStates);
-      if (onPinStateChange) {
-        onPinStateChange(initialStates);
-      }
-    }
-  }, [ic]);
+  // Remove local state management to avoid conflicts
+  const pinStates = ic?.pinConfiguration.reduce((acc, pin) => {
+    acc[pin.pin] = false;
+    return acc;
+  }, {} as { [key: number]: boolean }) || {};
 
   if (!ic) {
     return null;
@@ -51,16 +41,13 @@ export default function ICVisualizer({
   const togglePin = (pinNumber: number, pinType: string) => {
     if (!serialConnected || pinType !== "INPUT") return;
 
-    setPinStates((prev) => {
+    if (onPinStateChange) {
       const newStates = {
-        ...prev,
-        [pinNumber]: !prev[pinNumber],
+        ...pinStates,
+        [pinNumber]: !pinStates[pinNumber],
       };
-      if (onPinStateChange) {
-        onPinStateChange(newStates);
-      }
-      return newStates;
-    });
+      onPinStateChange(newStates);
+    }
   };
 
   const getPinColor = (pinType: string, state: boolean) => {
