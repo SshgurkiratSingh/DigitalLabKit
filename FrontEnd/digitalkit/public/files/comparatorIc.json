@@ -1,0 +1,170 @@
+{
+    "74SeriesICs": {
+        "COMPARATORS": {
+            "74LS85": {
+                "partNumber": "74LS85",
+                "description": "4-bit Magnitude Comparator",
+                "category": "COMPARATOR",
+                "pinCount": 16,
+                "pinConfiguration": [
+                    {
+                        "pin": 1,
+                        "name": "B3",
+                        "type": "INPUT",
+                        "function": "Input B3 (MSB)"
+                    },
+                    {
+                        "pin": 2,
+                        "name": "IA<B",
+                        "type": "INPUT",
+                        "function": "Cascade Input A<B"
+                    },
+                    {
+                        "pin": 3,
+                        "name": "IA=B",
+                        "type": "INPUT",
+                        "function": "Cascade Input A=B"
+                    },
+                    {
+                        "pin": 4,
+                        "name": "IA>B",
+                        "type": "INPUT",
+                        "function": "Cascade Input A>B"
+                    },
+                    {
+                        "pin": 5,
+                        "name": "OA>B",
+                        "type": "OUTPUT",
+                        "function": "Output A>B"
+                    },
+                    {
+                        "pin": 6,
+                        "name": "OA=B",
+                        "type": "OUTPUT",
+                        "function": "Output A=B"
+                    },
+                    {
+                        "pin": 7,
+                        "name": "OA<B",
+                        "type": "OUTPUT",
+                        "function": "Output A<B"
+                    },
+                    {
+                        "pin": 8,
+                        "name": "GND",
+                        "type": "POWER",
+                        "function": "Ground"
+                    },
+                    {
+                        "pin": 9,
+                        "name": "B0",
+                        "type": "INPUT",
+                        "function": "Input B0 (LSB)"
+                    },
+                    {
+                        "pin": 10,
+                        "name": "A0",
+                        "type": "INPUT",
+                        "function": "Input A0 (LSB)"
+                    },
+                    {
+                        "pin": 11,
+                        "name": "B1",
+                        "type": "INPUT",
+                        "function": "Input B1"
+                    },
+                    {
+                        "pin": 12,
+                        "name": "A1",
+                        "type": "INPUT",
+                        "function": "Input A1"
+                    },
+                    {
+                        "pin": 13,
+                        "name": "A2",
+                        "type": "INPUT",
+                        "function": "Input A2"
+                    },
+                    {
+                        "pin": 14,
+                        "name": "B2",
+                        "type": "INPUT",
+                        "function": "Input B2"
+                    },
+                    {
+                        "pin": 15,
+                        "name": "A3",
+                        "type": "INPUT",
+                        "function": "Input A3 (MSB)"
+                    },
+                    {
+                        "pin": 16,
+                        "name": "VCC",
+                        "type": "POWER",
+                        "function": "+5V Supply"
+                    }
+                ],
+                "functional": {
+                    "comparatorType": "MAGNITUDE",
+                    "outputLogic": {
+                        "activeHigh": [
+                            "OA>B",
+                            "OA<B",
+                            "OA=B"
+                        ],
+                        "cascadeSupport": true
+                    },
+                    "truthTable": [
+                        {
+                            "A": "0000",
+                            "B": "0000",
+                            "IA<B": 0,
+                            "IA=B": 1,
+                            "IA>B": 0,
+                            "OA<B": 0,
+                            "OA=B": 1,
+                            "OA>B": 0
+                        },
+                        {
+                            "A": "0010",
+                            "B": "0001",
+                            "IA<B": 0,
+                            "IA=B": 1,
+                            "IA>B": 0,
+                            "OA<B": 0,
+                            "OA=B": 0,
+                            "OA>B": 1
+                        },
+                        {
+                            "A": "0100",
+                            "B": "1000",
+                            "IA<B": 0,
+                            "IA=B": 1,
+                            "IA>B": 0,
+                            "OA<B": 1,
+                            "OA=B": 0,
+                            "OA>B": 0
+                        }
+                    ],
+                    "cascadingLogic": {
+                        "LSBConfig": {
+                            "IA<B": 0,
+                            "IA=B": 1,
+                            "IA>B": 0
+                        }
+                    },
+                    "timingSpecs": {
+                        "propagationDelay": "25ns",
+                        "maxCompareFrequency": "40MHz"
+                    }
+                },
+                "electricalSpecs": {
+                    "voltageRange": "4.75V to 5.25V",
+                    "inputHighVoltage": "2.0V min",
+                    "inputLowVoltage": "0.8V max",
+                    "outputCurrent": "8mA sink/0.4mA source"
+                }
+            }
+        }
+    }
+}

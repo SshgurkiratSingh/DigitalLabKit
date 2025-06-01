@@ -1,0 +1,55 @@
+{
+    "74SeriesICs": {
+      "ARITHMETIC": {
+        "74LS83": {
+          "partNumber": "74LS83",
+          "description": "4-bit Binary Full Adder with Fast Carry",
+          "category": "ADDER",
+          "pinCount": 16,
+          "pinConfiguration": [
+            {"pin": 1, "name": "A4", "type": "INPUT", "function": "Input A4 (MSB)"},
+            {"pin": 2, "name": "S3", "type": "OUTPUT", "function": "Sum Bit 3"},
+            {"pin": 3, "name": "A3", "type": "INPUT", "function": "Input A3"},
+            {"pin": 4, "name": "B3", "type": "INPUT", "function": "Input B3"},
+            {"pin": 5, "name": "VCC", "type": "POWER", "function": "+5V Supply"},
+            {"pin": 6, "name": "S2", "type": "OUTPUT", "function": "Sum Bit 2"},
+            {"pin": 7, "name": "B2", "type": "INPUT", "function": "Input B2"},
+            {"pin": 8, "name": "A2", "type": "INPUT", "function": "Input A2"},
+            {"pin": 9, "name": "S1", "type": "OUTPUT", "function": "Sum Bit 1"},
+            {"pin": 10, "name": "A1", "type": "INPUT", "function": "Input A1 (LSB)"},
+            {"pin": 11, "name": "B1", "type": "INPUT", "function": "Input B1 (LSB)"},
+            {"pin": 12, "name": "GND", "type": "POWER", "function": "Ground"},
+            {"pin": 13, "name": "C0", "type": "OUTPUT", "function": "Carry Output"},
+            {"pin": 14, "name": "C4", "type": "INPUT", "function": "Carry Input"},
+            {"pin": 15, "name": "S4", "type": "OUTPUT", "function": "Sum Bit 4 (MSB)"},
+            {"pin": 16, "name": "B4", "type": "INPUT", "function": "Input B4 (MSB)"}
+          ],
+          "functional": {
+            "adderType": "BINARY",
+            "bitWidth": 4,
+            "carryLogic": {
+              "carryIn": {"pin": 14},
+              "carryOut": {"pin": 13}
+            },
+            "truthTable": [
+              {"A": "0000", "B": "0000", "C4": 0, "S": "0000", "C0": 0},
+              {"A": "0001", "B": "0001", "C4": 0, "S": "0010", "C0": 0},
+              {"A": "1001", "B": "0110", "C4": 0, "S": "1111", "C0": 0},
+              {"A": "1111", "B": "0001", "C4": 0, "S": "0000", "C0": 1}
+            ],
+            "timingSpecs": {
+              "propagationDelay": "16ns",
+              "maxClockFrequency": "35MHz"
+            }
+          },
+          "electricalSpecs": {
+            "voltageRange": "4.75V to 5.25V",
+            "inputHighVoltage": "2.0V min",
+            "inputLowVoltage": "0.8V max",
+            "outputCurrent": "8mA sink/0.4mA source"
+          }
+        }
+      }
+    }
+  }
+  
