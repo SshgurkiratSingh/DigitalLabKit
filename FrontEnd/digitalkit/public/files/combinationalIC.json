@@ -1,0 +1,1319 @@
+{
+    "74SeriesICs": {
+        "LOGIC_GATES": {
+            "7400": {
+                "partNumber": "7400",
+                "description": "Quad 2-Input NAND Gate",
+                "category": "LOGIC_GATE",
+                "logicType": "NAND",
+                "pinCount": 14,
+                "pinConfiguration": [
+                    {
+                        "pin": 1,
+                        "name": "1A",
+                        "type": "INPUT",
+                        "function": "Gate 1 Input A"
+                    },
+                    {
+                        "pin": 2,
+                        "name": "1B",
+                        "type": "INPUT",
+                        "function": "Gate 1 Input B"
+                    },
+                    {
+                        "pin": 3,
+                        "name": "1Y",
+                        "type": "OUTPUT",
+                        "function": "Gate 1 Output"
+                    },
+                    {
+                        "pin": 4,
+                        "name": "2A",
+                        "type": "INPUT",
+                        "function": "Gate 2 Input A"
+                    },
+                    {
+                        "pin": 5,
+                        "name": "2B",
+                        "type": "INPUT",
+                        "function": "Gate 2 Input B"
+                    },
+                    {
+                        "pin": 6,
+                        "name": "2Y",
+                        "type": "OUTPUT",
+                        "function": "Gate 2 Output"
+                    },
+                    {
+                        "pin": 7,
+                        "name": "GND",
+                        "type": "POWER",
+                        "function": "Ground"
+                    },
+                    {
+                        "pin": 8,
+                        "name": "3Y",
+                        "type": "OUTPUT",
+                        "function": "Gate 3 Output"
+                    },
+                    {
+                        "pin": 9,
+                        "name": "3A",
+                        "type": "INPUT",
+                        "function": "Gate 3 Input A"
+                    },
+                    {
+                        "pin": 10,
+                        "name": "3B",
+                        "type": "INPUT",
+                        "function": "Gate 3 Input B"
+                    },
+                    {
+                        "pin": 11,
+                        "name": "4Y",
+                        "type": "OUTPUT",
+                        "function": "Gate 4 Output"
+                    },
+                    {
+                        "pin": 12,
+                        "name": "4A",
+                        "type": "INPUT",
+                        "function": "Gate 4 Input A"
+                    },
+                    {
+                        "pin": 13,
+                        "name": "4B",
+                        "type": "INPUT",
+                        "function": "Gate 4 Input B"
+                    },
+                    {
+                        "pin": 14,
+                        "name": "VCC",
+                        "type": "POWER",
+                        "function": "Positive Supply"
+                    }
+                ],
+                "functional": {
+                    "gateCount": 4,
+                    "inputsPerGate": 2,
+                    "truthTable": [
+                        {
+                            "inputs": [
+                                0,
+                                0
+                            ],
+                            "output": 1
+                        },
+                        {
+                            "inputs": [
+                                0,
+                                1
+                            ],
+                            "output": 1
+                        },
+                        {
+                            "inputs": [
+                                1,
+                                0
+                            ],
+                            "output": 1
+                        },
+                        {
+                            "inputs": [
+                                1,
+                                1
+                            ],
+                            "output": 0
+                        }
+                    ]
+                }
+            },
+            "7408": {
+                "partNumber": "7408",
+                "description": "Quad 2-Input AND Gate",
+                "category": "LOGIC_GATE",
+                "logicType": "AND",
+                "pinCount": 14,
+                "pinConfiguration": [
+                    {
+                        "pin": 1,
+                        "name": "1A",
+                        "type": "INPUT",
+                        "function": "Gate 1 Input A"
+                    },
+                    {
+                        "pin": 2,
+                        "name": "1B",
+                        "type": "INPUT",
+                        "function": "Gate 1 Input B"
+                    },
+                    {
+                        "pin": 3,
+                        "name": "1Y",
+                        "type": "OUTPUT",
+                        "function": "Gate 1 Output"
+                    },
+                    {
+                        "pin": 4,
+                        "name": "2A",
+                        "type": "INPUT",
+                        "function": "Gate 2 Input A"
+                    },
+                    {
+                        "pin": 5,
+                        "name": "2B",
+                        "type": "INPUT",
+                        "function": "Gate 2 Input B"
+                    },
+                    {
+                        "pin": 6,
+                        "name": "2Y",
+                        "type": "OUTPUT",
+                        "function": "Gate 2 Output"
+                    },
+                    {
+                        "pin": 7,
+                        "name": "GND",
+                        "type": "POWER",
+                        "function": "Ground"
+                    },
+                    {
+                        "pin": 8,
+                        "name": "3Y",
+                        "type": "OUTPUT",
+                        "function": "Gate 3 Output"
+                    },
+                    {
+                        "pin": 9,
+                        "name": "3A",
+                        "type": "INPUT",
+                        "function": "Gate 3 Input A"
+                    },
+                    {
+                        "pin": 10,
+                        "name": "3B",
+                        "type": "INPUT",
+                        "function": "Gate 3 Input B"
+                    },
+                    {
+                        "pin": 11,
+                        "name": "4Y",
+                        "type": "OUTPUT",
+                        "function": "Gate 4 Output"
+                    },
+                    {
+                        "pin": 12,
+                        "name": "4A",
+                        "type": "INPUT",
+                        "function": "Gate 4 Input A"
+                    },
+                    {
+                        "pin": 13,
+                        "name": "4B",
+                        "type": "INPUT",
+                        "function": "Gate 4 Input B"
+                    },
+                    {
+                        "pin": 14,
+                        "name": "VCC",
+                        "type": "POWER",
+                        "function": "Positive Supply"
+                    }
+                ],
+                "functional": {
+                    "gateCount": 4,
+                    "inputsPerGate": 2,
+                    "truthTable": [
+                        {
+                            "inputs": [
+                                0,
+                                0
+                            ],
+                            "output": 0
+                        },
+                        {
+                            "inputs": [
+                                0,
+                                1
+                            ],
+                            "output": 0
+                        },
+                        {
+                            "inputs": [
+                                1,
+                                0
+                            ],
+                            "output": 0
+                        },
+                        {
+                            "inputs": [
+                                1,
+                                1
+                            ],
+                            "output": 1
+                        }
+                    ]
+                }
+            },
+            "7432": {
+                "partNumber": "7432",
+                "description": "Quad 2-Input OR Gate",
+                "category": "LOGIC_GATE",
+                "logicType": "OR",
+                "pinCount": 14,
+                "pinConfiguration": [
+                    {
+                        "pin": 1,
+                        "name": "1A",
+                        "type": "INPUT",
+                        "function": "Gate 1 Input A"
+                    },
+                    {
+                        "pin": 2,
+                        "name": "1B",
+                        "type": "INPUT",
+                        "function": "Gate 1 Input B"
+                    },
+                    {
+                        "pin": 3,
+                        "name": "1Y",
+                        "type": "OUTPUT",
+                        "function": "Gate 1 Output"
+                    },
+                    {
+                        "pin": 4,
+                        "name": "2A",
+                        "type": "INPUT",
+                        "function": "Gate 2 Input A"
+                    },
+                    {
+                        "pin": 5,
+                        "name": "2B",
+                        "type": "INPUT",
+                        "function": "Gate 2 Input B"
+                    },
+                    {
+                        "pin": 6,
+                        "name": "2Y",
+                        "type": "OUTPUT",
+                        "function": "Gate 2 Output"
+                    },
+                    {
+                        "pin": 7,
+                        "name": "GND",
+                        "type": "POWER",
+                        "function": "Ground"
+                    },
+                    {
+                        "pin": 8,
+                        "name": "3Y",
+                        "type": "OUTPUT",
+                        "function": "Gate 3 Output"
+                    },
+                    {
+                        "pin": 9,
+                        "name": "3A",
+                        "type": "INPUT",
+                        "function": "Gate 3 Input A"
+                    },
+                    {
+                        "pin": 10,
+                        "name": "3B",
+                        "type": "INPUT",
+                        "function": "Gate 3 Input B"
+                    },
+                    {
+                        "pin": 11,
+                        "name": "4Y",
+                        "type": "OUTPUT",
+                        "function": "Gate 4 Output"
+                    },
+                    {
+                        "pin": 12,
+                        "name": "4A",
+                        "type": "INPUT",
+                        "function": "Gate 4 Input A"
+                    },
+                    {
+                        "pin": 13,
+                        "name": "4B",
+                        "type": "INPUT",
+                        "function": "Gate 4 Input B"
+                    },
+                    {
+                        "pin": 14,
+                        "name": "VCC",
+                        "type": "POWER",
+                        "function": "Positive Supply"
+                    }
+                ],
+                "functional": {
+                    "gateCount": 4,
+                    "inputsPerGate": 2,
+                    "truthTable": [
+                        {
+                            "inputs": [
+                                0,
+                                0
+                            ],
+                            "output": 0
+                        },
+                        {
+                            "inputs": [
+                                0,
+                                1
+                            ],
+                            "output": 1
+                        },
+                        {
+                            "inputs": [
+                                1,
+                                0
+                            ],
+                            "output": 1
+                        },
+                        {
+                            "inputs": [
+                                1,
+                                1
+                            ],
+                            "output": 1
+                        }
+                    ]
+                }
+            },
+            "7402": {
+                "partNumber": "7402",
+                "description": "Quad 2-Input NOR Gate",
+                "category": "LOGIC_GATE",
+                "logicType": "NOR",
+                "pinCount": 14,
+                "pinConfiguration": [
+                    {
+                        "pin": 1,
+                        "name": "1Y",
+                        "type": "OUTPUT",
+                        "function": "Gate 1 Output"
+                    },
+                    {
+                        "pin": 2,
+                        "name": "1A",
+                        "type": "INPUT",
+                        "function": "Gate 1 Input A"
+                    },
+                    {
+                        "pin": 3,
+                        "name": "1B",
+                        "type": "INPUT",
+                        "function": "Gate 1 Input B"
+                    },
+                    {
+                        "pin": 4,
+                        "name": "2Y",
+                        "type": "OUTPUT",
+                        "function": "Gate 2 Output"
+                    },
+                    {
+                        "pin": 5,
+                        "name": "2A",
+                        "type": "INPUT",
+                        "function": "Gate 2 Input A"
+                    },
+                    {
+                        "pin": 6,
+                        "name": "2B",
+                        "type": "INPUT",
+                        "function": "Gate 2 Input B"
+                    },
+                    {
+                        "pin": 7,
+                        "name": "GND",
+                        "type": "POWER",
+                        "function": "Ground"
+                    },
+                    {
+                        "pin": 8,
+                        "name": "3A",
+                        "type": "INPUT",
+                        "function": "Gate 3 Input A"
+                    },
+                    {
+                        "pin": 9,
+                        "name": "3B",
+                        "type": "INPUT",
+                        "function": "Gate 3 Input B"
+                    },
+                    {
+                        "pin": 10,
+                        "name": "3Y",
+                        "type": "OUTPUT",
+                        "function": "Gate 3 Output"
+                    },
+                    {
+                        "pin": 11,
+                        "name": "4A",
+                        "type": "INPUT",
+                        "function": "Gate 4 Input A"
+                    },
+                    {
+                        "pin": 12,
+                        "name": "4B",
+                        "type": "INPUT",
+                        "function": "Gate 4 Input B"
+                    },
+                    {
+                        "pin": 13,
+                        "name": "4Y",
+                        "type": "OUTPUT",
+                        "function": "Gate 4 Output"
+                    },
+                    {
+                        "pin": 14,
+                        "name": "VCC",
+                        "type": "POWER",
+                        "function": "Positive Supply"
+                    }
+                ],
+                "functional": {
+                    "gateCount": 4,
+                    "inputsPerGate": 2,
+                    "truthTable": [
+                        {
+                            "inputs": [
+                                0,
+                                0
+                            ],
+                            "output": 1
+                        },
+                        {
+                            "inputs": [
+                                0,
+                                1
+                            ],
+                            "output": 0
+                        },
+                        {
+                            "inputs": [
+                                1,
+                                0
+                            ],
+                            "output": 0
+                        },
+                        {
+                            "inputs": [
+                                1,
+                                1
+                            ],
+                            "output": 0
+                        }
+                    ]
+                }
+            },
+            "7486": {
+                "partNumber": "7486",
+                "description": "Quad 2-Input XOR Gate",
+                "category": "LOGIC_GATE",
+                "logicType": "XOR",
+                "pinCount": 14,
+                "pinConfiguration": [
+                    {
+                        "pin": 1,
+                        "name": "1A",
+                        "type": "INPUT",
+                        "function": "Gate 1 Input A"
+                    },
+                    {
+                        "pin": 2,
+                        "name": "1B",
+                        "type": "INPUT",
+                        "function": "Gate 1 Input B"
+                    },
+                    {
+                        "pin": 3,
+                        "name": "1Y",
+                        "type": "OUTPUT",
+                        "function": "Gate 1 Output"
+                    },
+                    {
+                        "pin": 4,
+                        "name": "2A",
+                        "type": "INPUT",
+                        "function": "Gate 2 Input A"
+                    },
+                    {
+                        "pin": 5,
+                        "name": "2B",
+                        "type": "INPUT",
+                        "function": "Gate 2 Input B"
+                    },
+                    {
+                        "pin": 6,
+                        "name": "2Y",
+                        "type": "OUTPUT",
+                        "function": "Gate 2 Output"
+                    },
+                    {
+                        "pin": 7,
+                        "name": "GND",
+                        "type": "POWER",
+                        "function": "Ground"
+                    },
+                    {
+                        "pin": 8,
+                        "name": "3Y",
+                        "type": "OUTPUT",
+                        "function": "Gate 3 Output"
+                    },
+                    {
+                        "pin": 9,
+                        "name": "3A",
+                        "type": "INPUT",
+                        "function": "Gate 3 Input A"
+                    },
+                    {
+                        "pin": 10,
+                        "name": "3B",
+                        "type": "INPUT",
+                        "function": "Gate 3 Input B"
+                    },
+                    {
+                        "pin": 11,
+                        "name": "4Y",
+                        "type": "OUTPUT",
+                        "function": "Gate 4 Output"
+                    },
+                    {
+                        "pin": 12,
+                        "name": "4A",
+                        "type": "INPUT",
+                        "function": "Gate 4 Input A"
+                    },
+                    {
+                        "pin": 13,
+                        "name": "4B",
+                        "type": "INPUT",
+                        "function": "Gate 4 Input B"
+                    },
+                    {
+                        "pin": 14,
+                        "name": "VCC",
+                        "type": "POWER",
+                        "function": "Positive Supply"
+                    }
+                ],
+                "functional": {
+                    "gateCount": 4,
+                    "inputsPerGate": 2,
+                    "truthTable": [
+                        {
+                            "inputs": [
+                                0,
+                                0
+                            ],
+                            "output": 0
+                        },
+                        {
+                            "inputs": [
+                                0,
+                                1
+                            ],
+                            "output": 1
+                        },
+                        {
+                            "inputs": [
+                                1,
+                                0
+                            ],
+                            "output": 1
+                        },
+                        {
+                            "inputs": [
+                                1,
+                                1
+                            ],
+                            "output": 0
+                        }
+                    ]
+                }
+            },
+            "7404": {
+                "partNumber": "7404",
+                "description": "Hex Inverter",
+                "category": "LOGIC_GATE",
+                "logicType": "NOT",
+                "pinCount": 14,
+                "pinConfiguration": [
+                    {
+                        "pin": 1,
+                        "name": "1A",
+                        "type": "INPUT",
+                        "function": "Gate 1 Input"
+                    },
+                    {
+                        "pin": 2,
+                        "name": "1Y",
+                        "type": "OUTPUT",
+                        "function": "Gate 1 Output"
+                    },
+                    {
+                        "pin": 3,
+                        "name": "2A",
+                        "type": "INPUT",
+                        "function": "Gate 2 Input"
+                    },
+                    {
+                        "pin": 4,
+                        "name": "2Y",
+                        "type": "OUTPUT",
+                        "function": "Gate 2 Output"
+                    },
+                    {
+                        "pin": 5,
+                        "name": "3A",
+                        "type": "INPUT",
+                        "function": "Gate 3 Input"
+                    },
+                    {
+                        "pin": 6,
+                        "name": "3Y",
+                        "type": "OUTPUT",
+                        "function": "Gate 3 Output"
+                    },
+                    {
+                        "pin": 7,
+                        "name": "GND",
+                        "type": "POWER",
+                        "function": "Ground"
+                    },
+                    {
+                        "pin": 8,
+                        "name": "4Y",
+                        "type": "OUTPUT",
+                        "function": "Gate 4 Output"
+                    },
+                    {
+                        "pin": 9,
+                        "name": "4A",
+                        "type": "INPUT",
+                        "function": "Gate 4 Input"
+                    },
+                    {
+                        "pin": 10,
+                        "name": "5Y",
+                        "type": "OUTPUT",
+                        "function": "Gate 5 Output"
+                    },
+                    {
+                        "pin": 11,
+                        "name": "5A",
+                        "type": "INPUT",
+                        "function": "Gate 5 Input"
+                    },
+                    {
+                        "pin": 12,
+                        "name": "6Y",
+                        "type": "OUTPUT",
+                        "function": "Gate 6 Output"
+                    },
+                    {
+                        "pin": 13,
+                        "name": "6A",
+                        "type": "INPUT",
+                        "function": "Gate 6 Input"
+                    },
+                    {
+                        "pin": 14,
+                        "name": "VCC",
+                        "type": "POWER",
+                        "function": "Positive Supply"
+                    }
+                ],
+                "functional": {
+                    "gateCount": 6,
+                    "inputsPerGate": 1,
+                    "truthTable": [
+                        {
+                            "inputs": [
+                                0
+                            ],
+                            "output": 1
+                        },
+                        {
+                            "inputs": [
+                                1
+                            ],
+                            "output": 0
+                        }
+                    ]
+                }
+            }
+        },
+        "ELECTRICAL_SPECS": {
+            "voltageRange": "4.75V to 5.25V",
+            "inputHighVoltage": "2.0V min",
+            "inputLowVoltage": "0.8V max",
+            "outputCurrent": "16mA max",
+            "powerConsumption": "10mW typical per gate"
+        },
+        "MULTIPLEXERS": {
+            "74157": {
+                "partNumber": "74157",
+                "description": "Quad 2-to-1 Line Data Selector/Multiplexer",
+                "category": "MULTIPLEXER",
+                "pinCount": 16,
+                "pinConfiguration": [
+                    {
+                        "pin": 1,
+                        "name": "S",
+                        "type": "INPUT",
+                        "function": "Select input (A=0/B=1)"
+                    },
+                    {
+                        "pin": 2,
+                        "name": "A0",
+                        "type": "INPUT",
+                        "function": "Input A0"
+                    },
+                    {
+                        "pin": 3,
+                        "name": "B0",
+                        "type": "INPUT",
+                        "function": "Input B0"
+                    },
+                    {
+                        "pin": 4,
+                        "name": "Y0",
+                        "type": "OUTPUT",
+                        "function": "Output 0"
+                    },
+                    {
+                        "pin": 5,
+                        "name": "A1",
+                        "type": "INPUT",
+                        "function": "Input A1"
+                    },
+                    {
+                        "pin": 6,
+                        "name": "B1",
+                        "type": "INPUT",
+                        "function": "Input B1"
+                    },
+                    {
+                        "pin": 7,
+                        "name": "Y1",
+                        "type": "OUTPUT",
+                        "function": "Output 1"
+                    },
+                    {
+                        "pin": 8,
+                        "name": "GND",
+                        "type": "POWER",
+                        "function": "Ground"
+                    },
+                    {
+                        "pin": 9,
+                        "name": "Y2",
+                        "type": "OUTPUT",
+                        "function": "Output 2"
+                    },
+                    {
+                        "pin": 10,
+                        "name": "B2",
+                        "type": "INPUT",
+                        "function": "Input B2"
+                    },
+                    {
+                        "pin": 11,
+                        "name": "A2",
+                        "type": "INPUT",
+                        "function": "Input A2"
+                    },
+                    {
+                        "pin": 12,
+                        "name": "Y3",
+                        "type": "OUTPUT",
+                        "function": "Output 3"
+                    },
+                    {
+                        "pin": 13,
+                        "name": "B3",
+                        "type": "INPUT",
+                        "function": "Input B3"
+                    },
+                    {
+                        "pin": 14,
+                        "name": "A3",
+                        "type": "INPUT",
+                        "function": "Input A3"
+                    },
+                    {
+                        "pin": 15,
+                        "name": "G",
+                        "type": "INPUT",
+                        "function": "Enable (active low)"
+                    },
+                    {
+                        "pin": 16,
+                        "name": "VCC",
+                        "type": "POWER",
+                        "function": "+5V Supply"
+                    }
+                ],
+                "functional": {
+                    "type": "2_TO_1",
+                    "channels": 4,
+                    "truthTable": [
+                        {
+                            "G": 1,
+                            "S": "X",
+                            "A": "X",
+                            "B": "X",
+                            "Y": 0
+                        },
+                        {
+                            "G": 0,
+                            "S": 0,
+                            "A": 0,
+                            "B": "X",
+                            "Y": 0
+                        },
+                        {
+                            "G": 0,
+                            "S": 0,
+                            "A": 1,
+                            "B": "X",
+                            "Y": 1
+                        },
+                        {
+                            "G": 0,
+                            "S": 1,
+                            "A": "X",
+                            "B": 0,
+                            "Y": 0
+                        },
+                        {
+                            "G": 0,
+                            "S": 1,
+                            "A": "X",
+                            "B": 1,
+                            "Y": 1
+                        }
+                    ]
+                }
+            }
+        },
+        "DEMULTIPLEXERS": {
+            "74139": {
+                "partNumber": "74139",
+                "description": "Dual 2-to-4 Line Decoder/Demultiplexer",
+                "category": "DEMULTIPLEXER",
+                "pinCount": 16,
+                "pinConfiguration": [
+                    {
+                        "pin": 1,
+                        "name": "1E",
+                        "type": "INPUT",
+                        "function": "Decoder 1 Enable (active low)"
+                    },
+                    {
+                        "pin": 2,
+                        "name": "1A0",
+                        "type": "INPUT",
+                        "function": "Address input 0"
+                    },
+                    {
+                        "pin": 3,
+                        "name": "1A1",
+                        "type": "INPUT",
+                        "function": "Address input 1"
+                    },
+                    {
+                        "pin": 4,
+                        "name": "1Y0",
+                        "type": "OUTPUT",
+                        "function": "Output 0 (active low)"
+                    },
+                    {
+                        "pin": 5,
+                        "name": "1Y1",
+                        "type": "OUTPUT",
+                        "function": "Output 1 (active low)"
+                    },
+                    {
+                        "pin": 6,
+                        "name": "1Y2",
+                        "type": "OUTPUT",
+                        "function": "Output 2 (active low)"
+                    },
+                    {
+                        "pin": 7,
+                        "name": "1Y3",
+                        "type": "OUTPUT",
+                        "function": "Output 3 (active low)"
+                    },
+                    {
+                        "pin": 8,
+                        "name": "GND",
+                        "type": "POWER",
+                        "function": "Ground"
+                    },
+                    {
+                        "pin": 9,
+                        "name": "2Y3",
+                        "type": "OUTPUT",
+                        "function": "Output 3 (active low)"
+                    },
+                    {
+                        "pin": 10,
+                        "name": "2Y2",
+                        "type": "OUTPUT",
+                        "function": "Output 2 (active low)"
+                    },
+                    {
+                        "pin": 11,
+                        "name": "2Y1",
+                        "type": "OUTPUT",
+                        "function": "Output 1 (active low)"
+                    },
+                    {
+                        "pin": 12,
+                        "name": "2Y0",
+                        "type": "OUTPUT",
+                        "function": "Output 0 (active low)"
+                    },
+                    {
+                        "pin": 13,
+                        "name": "2A1",
+                        "type": "INPUT",
+                        "function": "Address input 1"
+                    },
+                    {
+                        "pin": 14,
+                        "name": "2A0",
+                        "type": "INPUT",
+                        "function": "Address input 0"
+                    },
+                    {
+                        "pin": 15,
+                        "name": "2E",
+                        "type": "INPUT",
+                        "function": "Decoder 2 Enable (active low)"
+                    },
+                    {
+                        "pin": 16,
+                        "name": "VCC",
+                        "type": "POWER",
+                        "function": "+5V Supply"
+                    }
+                ],
+                "functional": {
+                    "type": "2_TO_4",
+                    "decoders": 2,
+                    "outputType": "ACTIVE_LOW",
+                    "truthTable": [
+                        {
+                            "E": 1,
+                            "A0": "X",
+                            "A1": "X",
+                            "Y0": 1,
+                            "Y1": 1,
+                            "Y2": 1,
+                            "Y3": 1
+                        },
+                        {
+                            "E": 0,
+                            "A0": 0,
+                            "A1": 0,
+                            "Y0": 0,
+                            "Y1": 1,
+                            "Y2": 1,
+                            "Y3": 1
+                        },
+                        {
+                            "E": 0,
+                            "A0": 1,
+                            "A1": 0,
+                            "Y0": 1,
+                            "Y1": 0,
+                            "Y2": 1,
+                            "Y3": 1
+                        },
+                        {
+                            "E": 0,
+                            "A0": 0,
+                            "A1": 1,
+                            "Y0": 1,
+                            "Y1": 1,
+                            "Y2": 0,
+                            "Y3": 1
+                        },
+                        {
+                            "E": 0,
+                            "A0": 1,
+                            "A1": 1,
+                            "Y0": 1,
+                            "Y1": 1,
+                            "Y2": 1,
+                            "Y3": 0
+                        }
+                    ]
+                }
+            }
+        },
+        "74LS138": {
+            "partNumber": "74LS138",
+            "description": "3-to-8 Line Decoder/Demultiplexer with Active-Low Outputs",
+            "category": "DECODER",
+            "package": "DIP16",
+            "pinConfiguration": [
+                {
+                    "pin": 1,
+                    "name": "A",
+                    "type": "INPUT",
+                    "function": "Address input LSB"
+                },
+                {
+                    "pin": 2,
+                    "name": "B",
+                    "type": "INPUT",
+                    "function": "Address input"
+                },
+                {
+                    "pin": 3,
+                    "name": "C",
+                    "type": "INPUT",
+                    "function": "Address input MSB"
+                },
+                {
+                    "pin": 4,
+                    "name": "G2A",
+                    "type": "INPUT",
+                    "function": "Enable input (active low)"
+                },
+                {
+                    "pin": 5,
+                    "name": "G2B",
+                    "type": "INPUT",
+                    "function": "Enable input (active low)"
+                },
+                {
+                    "pin": 6,
+                    "name": "G1",
+                    "type": "INPUT",
+                    "function": "Enable input (active high)"
+                },
+                {
+                    "pin": 7,
+                    "name": "Y7",
+                    "type": "OUTPUT",
+                    "function": "Output 7 (active low)"
+                },
+                {
+                    "pin": 8,
+                    "name": "GND",
+                    "type": "POWER",
+                    "function": "Ground"
+                },
+                {
+                    "pin": 9,
+                    "name": "Y6",
+                    "type": "OUTPUT",
+                    "function": "Output 6 (active low)"
+                },
+                {
+                    "pin": 10,
+                    "name": "Y5",
+                    "type": "OUTPUT",
+                    "function": "Output 5 (active low)"
+                },
+                {
+                    "pin": 11,
+                    "name": "Y4",
+                    "type": "OUTPUT",
+                    "function": "Output 4 (active low)"
+                },
+                {
+                    "pin": 12,
+                    "name": "Y3",
+                    "type": "OUTPUT",
+                    "function": "Output 3 (active low)"
+                },
+                {
+                    "pin": 13,
+                    "name": "Y2",
+                    "type": "OUTPUT",
+                    "function": "Output 2 (active low)"
+                },
+                {
+                    "pin": 14,
+                    "name": "Y1",
+                    "type": "OUTPUT",
+                    "function": "Output 1 (active low)"
+                },
+                {
+                    "pin": 15,
+                    "name": "Y0",
+                    "type": "OUTPUT",
+                    "function": "Output 0 (active low)"
+                },
+                {
+                    "pin": 16,
+                    "name": "VCC",
+                    "type": "POWER",
+                    "function": "+5V Supply"
+                }
+            ],
+            "functional": {
+                "decoderType": "3_TO_8",
+                "outputType": "ACTIVE_LOW",
+                "enableConditions": {
+                    "G1": "HIGH",
+                    "G2A": "LOW",
+                    "G2B": "LOW"
+                },
+                "truthTable": [
+                    {
+                        "inputs": {
+                            "G1": 0,
+                            "G2A": 1,
+                            "G2B": 1,
+                            "C": 0,
+                            "B": 0,
+                            "A": 0
+                        },
+                        "outputs": {
+                            "Y0-Y7": "11111111"
+                        }
+                    },
+                    {
+                        "inputs": {
+                            "G1": 1,
+                            "G2A": 0,
+                            "G2B": 0,
+                            "C": 0,
+                            "B": 0,
+                            "A": 0
+                        },
+                        "outputs": {
+                            "Y0": 0,
+                            "Y1-Y7": 1
+                        }
+                    },
+                    {
+                        "inputs": {
+                            "G1": 1,
+                            "G2A": 0,
+                            "G2B": 0,
+                            "C": 0,
+                            "B": 0,
+                            "A": 1
+                        },
+                        "outputs": {
+                            "Y1": 0,
+                            "others": 1
+                        }
+                    },
+                    {
+                        "inputs": {
+                            "G1": 1,
+                            "G2A": 0,
+                            "G2B": 0,
+                            "C": 0,
+                            "B": 1,
+                            "A": 0
+                        },
+                        "outputs": {
+                            "Y2": 0,
+                            "others": 1
+                        }
+                    },
+                    {
+                        "inputs": {
+                            "G1": 1,
+                            "G2A": 0,
+                            "G2B": 0,
+                            "C": 0,
+                            "B": 1,
+                            "A": 1
+                        },
+                        "outputs": {
+                            "Y3": 0,
+                            "others": 1
+                        }
+                    },
+                    {
+                        "inputs": {
+                            "G1": 1,
+                            "G2A": 0,
+                            "G2B": 0,
+                            "C": 1,
+                            "B": 0,
+                            "A": 0
+                        },
+                        "outputs": {
+                            "Y4": 0,
+                            "others": 1
+                        }
+                    },
+                    {
+                        "inputs": {
+                            "G1": 1,
+                            "G2A": 0,
+                            "G2B": 0,
+                            "C": 1,
+                            "B": 0,
+                            "A": 1
+                        },
+                        "outputs": {
+                            "Y5": 0,
+                            "others": 1
+                        }
+                    },
+                    {
+                        "inputs": {
+                            "G1": 1,
+                            "G2A": 0,
+                            "G2B": 0,
+                            "C": 1,
+                            "B": 1,
+                            "A": 0
+                        },
+                        "outputs": {
+                            "Y6": 0,
+                            "others": 1
+                        }
+                    },
+                    {
+                        "inputs": {
+                            "G1": 1,
+                            "G2A": 0,
+                            "G2B": 0,
+                            "C": 1,
+                            "B": 1,
+                            "A": 1
+                        },
+                        "outputs": {
+                            "Y7": 0,
+                            "others": 1
+                        }
+                    }
+                ]
+            },
+            "electrical": {
+                "voltageRange": "4.75V to 5.25V",
+                "inputHighVoltage": "2.0V min",
+                "inputLowVoltage": "0.8V max",
+                "outputCurrent": "8mA max",
+                "propagationDelay": "14ns typ"
+            },
+            "applications": [
+                "Memory address decoding",
+                "Data routing systems",
+                "Demultiplexing operations",
+                "Digital signal distribution"
+            ],
+            "manufacturer": "Texas Instruments",
+            "datasheet": "https://www.ti.com/lit/gpn/SN74LS138"
+        }
+    }
+}

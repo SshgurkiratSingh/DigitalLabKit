@@ -1,0 +1,303 @@
+{
+    "74SeriesICs": {
+        "FLIP_FLOPS": {
+            "7473": {
+                "partNumber": "7473",
+                "description": "Dual JK Flip-Flop with Clear",
+                "category": "FLIP_FLOP",
+                "pinCount": 14,
+                "pinConfiguration": [
+                    {
+                        "pin": 1,
+                        "name": "CLK1",
+                        "type": "INPUT",
+                        "function": "Clock input for FF1 (negative-edge)"
+                    },
+                    {
+                        "pin": 2,
+                        "name": "CLR1",
+                        "type": "INPUT",
+                        "function": "Asynchronous clear for FF1 (active low)"
+                    },
+                    {
+                        "pin": 3,
+                        "name": "K1",
+                        "type": "INPUT",
+                        "function": "K input for FF1"
+                    },
+                    {
+                        "pin": 4,
+                        "name": "VCC",
+                        "type": "POWER",
+                        "function": "+5V supply"
+                    },
+                    {
+                        "pin": 5,
+                        "name": "CLK2",
+                        "type": "INPUT",
+                        "function": "Clock input for FF2 (negative-edge)"
+                    },
+                    {
+                        "pin": 6,
+                        "name": "CLR2",
+                        "type": "INPUT",
+                        "function": "Asynchronous clear for FF2 (active low)"
+                    },
+                    {
+                        "pin": 7,
+                        "name": "J2",
+                        "type": "INPUT",
+                        "function": "J input for FF2"
+                    },
+                    {
+                        "pin": 8,
+                        "name": "Q2B",
+                        "type": "OUTPUT",
+                        "function": "Complementary output for FF2"
+                    },
+                    {
+                        "pin": 9,
+                        "name": "Q2",
+                        "type": "OUTPUT",
+                        "function": "True output for FF2"
+                    },
+                    {
+                        "pin": 10,
+                        "name": "K2",
+                        "type": "INPUT",
+                        "function": "K input for FF2"
+                    },
+                    {
+                        "pin": 11,
+                        "name": "GND",
+                        "type": "POWER",
+                        "function": "Ground"
+                    },
+                    {
+                        "pin": 12,
+                        "name": "Q1",
+                        "type": "OUTPUT",
+                        "function": "True output for FF1"
+                    },
+                    {
+                        "pin": 13,
+                        "name": "Q1B",
+                        "type": "OUTPUT",
+                        "function": "Complementary output for FF1"
+                    },
+                    {
+                        "pin": 14,
+                        "name": "J1",
+                        "type": "INPUT",
+                        "function": "J input for FF1"
+                    }
+                ],
+                "functional": {
+                    "ffType": "JK",
+                    "edgeTrigger": "FALLING",
+                    "asyncPins": [
+                        {
+                            "pin": 2,
+                            "function": "CLEAR",
+                            "activeLow": true
+                        },
+                        {
+                            "pin": 6,
+                            "function": "CLEAR",
+                            "activeLow": true
+                        }
+                    ],
+                    "truthTable": [
+                        {
+                            "CLR": 0,
+                            "CLK": "X",
+                            "J": "X",
+                            "K": "X",
+                            "Q": 0,
+                            "QB": 1
+                        },
+                        {
+                            "CLR": 1,
+                            "CLK": "↓",
+                            "J": 0,
+                            "K": 0,
+                            "Q": "Qprev",
+                            "QB": "QBprev"
+                        },
+                        {
+                            "CLR": 1,
+                            "CLK": "↓",
+                            "J": 0,
+                            "K": 1,
+                            "Q": 0,
+                            "QB": 1
+                        },
+                        {
+                            "CLR": 1,
+                            "CLK": "↓",
+                            "J": 1,
+                            "K": 0,
+                            "Q": 1,
+                            "QB": 0
+                        },
+                        {
+                            "CLR": 1,
+                            "CLK": "↓",
+                            "J": 1,
+                            "K": 1,
+                            "Q": "QBprev",
+                            "QB": "Qprev"
+                        }
+                    ],
+                    "timingSpecs": {
+                        "setupTime": "20ns",
+                        "holdTime": "5ns",
+                        "propagationDelay": "25ns"
+                    }
+                }
+            }
+        },
+        "LATCHES": {
+            "7475": {
+                "partNumber": "7475",
+                "description": "4-bit Bistable Latch",
+                "category": "LATCH",
+                "pinCount": 16,
+                "pinConfiguration": [
+                    {
+                        "pin": 1,
+                        "name": "Q1B",
+                        "type": "OUTPUT",
+                        "function": "Complementary output for Latch1"
+                    },
+                    {
+                        "pin": 2,
+                        "name": "D1",
+                        "type": "INPUT",
+                        "function": "Data input for Latch1"
+                    },
+                    {
+                        "pin": 3,
+                        "name": "D2",
+                        "type": "INPUT",
+                        "function": "Data input for Latch2"
+                    },
+                    {
+                        "pin": 4,
+                        "name": "LE34",
+                        "type": "INPUT",
+                        "function": "Latch enable for Latch3/4"
+                    },
+                    {
+                        "pin": 5,
+                        "name": "VCC",
+                        "type": "POWER",
+                        "function": "+5V supply"
+                    },
+                    {
+                        "pin": 6,
+                        "name": "D3",
+                        "type": "INPUT",
+                        "function": "Data input for Latch3"
+                    },
+                    {
+                        "pin": 7,
+                        "name": "D4",
+                        "type": "INPUT",
+                        "function": "Data input for Latch4"
+                    },
+                    {
+                        "pin": 8,
+                        "name": "Q4B",
+                        "type": "OUTPUT",
+                        "function": "Complementary output for Latch4"
+                    },
+                    {
+                        "pin": 9,
+                        "name": "Q4",
+                        "type": "OUTPUT",
+                        "function": "True output for Latch4"
+                    },
+                    {
+                        "pin": 10,
+                        "name": "Q3",
+                        "type": "OUTPUT",
+                        "function": "True output for Latch3"
+                    },
+                    {
+                        "pin": 11,
+                        "name": "Q3B",
+                        "type": "OUTPUT",
+                        "function": "Complementary output for Latch3"
+                    },
+                    {
+                        "pin": 12,
+                        "name": "GND",
+                        "type": "POWER",
+                        "function": "Ground"
+                    },
+                    {
+                        "pin": 13,
+                        "name": "LE12",
+                        "type": "INPUT",
+                        "function": "Latch enable for Latch1/2"
+                    },
+                    {
+                        "pin": 14,
+                        "name": "Q2B",
+                        "type": "OUTPUT",
+                        "function": "Complementary output for Latch2"
+                    },
+                    {
+                        "pin": 15,
+                        "name": "Q2",
+                        "type": "OUTPUT",
+                        "function": "True output for Latch2"
+                    },
+                    {
+                        "pin": 16,
+                        "name": "Q1",
+                        "type": "OUTPUT",
+                        "function": "True output for Latch1"
+                    }
+                ],
+                "functional": {
+                    "latchType": "D",
+                    "truthTable": [
+                        {
+                            "LE": 0,
+                            "D": "X",
+                            "Q": "Qprev"
+                        },
+                        {
+                            "LE": 1,
+                            "D": 0,
+                            "Q": 0
+                        },
+                        {
+                            "LE": 1,
+                            "D": 1,
+                            "Q": 1
+                        }
+                    ],
+                    "enableLogic": {
+                        "LE12": "Controls Latches 1-2",
+                        "LE34": "Controls Latches 3-4"
+                    },
+                    "timingSpecs": {
+                        "setupTime": "15ns",
+                        "holdTime": "0ns",
+                        "propagationDelay": "20ns"
+                    }
+                }
+            }
+        },
+        "ELECTRICAL_SPECS": {
+            "voltageRange": "4.75V to 5.25V",
+            "inputHighVoltage": "2.0V min",
+            "inputLowVoltage": "0.8V max",
+            "outputCurrent": "8mA sink/0.4mA source",
+            "powerConsumption": "10mW per flip-flop/latch"
+        }
+    }
+}

@@ -1,0 +1,428 @@
+{
+    "74SeriesICs": {
+        "BCD_DECODERS": {
+            "7447": {
+                "partNumber": "7447",
+                "description": "BCD to 7-Segment Decoder/Driver (Common Anode)",
+                "category": "BCD_DECODER",
+                "pinCount": 16,
+                "pinConfiguration": [
+                    {
+                        "pin": 1,
+                        "name": "B",
+                        "type": "INPUT",
+                        "function": "BCD Input B"
+                    },
+                    {
+                        "pin": 2,
+                        "name": "C",
+                        "type": "INPUT",
+                        "function": "BCD Input C"
+                    },
+                    {
+                        "pin": 3,
+                        "name": "LT",
+                        "type": "INPUT",
+                        "function": "Lamp Test (Active Low)"
+                    },
+                    {
+                        "pin": 4,
+                        "name": "BI/RBO",
+                        "type": "IO",
+                        "function": "Blanking Input/Ripple Blanking Output"
+                    },
+                    {
+                        "pin": 5,
+                        "name": "RBI",
+                        "type": "INPUT",
+                        "function": "Ripple Blanking Input (Active Low)"
+                    },
+                    {
+                        "pin": 6,
+                        "name": "D",
+                        "type": "INPUT",
+                        "function": "BCD Input D"
+                    },
+                    {
+                        "pin": 7,
+                        "name": "A",
+                        "type": "INPUT",
+                        "function": "BCD Input A"
+                    },
+                    {
+                        "pin": 8,
+                        "name": "GND",
+                        "type": "POWER",
+                        "function": "Ground"
+                    },
+                    {
+                        "pin": 9,
+                        "name": "e",
+                        "type": "OUTPUT",
+                        "function": "Segment e (Active Low)"
+                    },
+                    {
+                        "pin": 10,
+                        "name": "d",
+                        "type": "OUTPUT",
+                        "function": "Segment d (Active Low)"
+                    },
+                    {
+                        "pin": 11,
+                        "name": "c",
+                        "type": "OUTPUT",
+                        "function": "Segment c (Active Low)"
+                    },
+                    {
+                        "pin": 12,
+                        "name": "b",
+                        "type": "OUTPUT",
+                        "function": "Segment b (Active Low)"
+                    },
+                    {
+                        "pin": 13,
+                        "name": "a",
+                        "type": "OUTPUT",
+                        "function": "Segment a (Active Low)"
+                    },
+                    {
+                        "pin": 14,
+                        "name": "g",
+                        "type": "OUTPUT",
+                        "function": "Segment g (Active Low)"
+                    },
+                    {
+                        "pin": 15,
+                        "name": "f",
+                        "type": "OUTPUT",
+                        "function": "Segment f (Active Low)"
+                    },
+                    {
+                        "pin": 16,
+                        "name": "VCC",
+                        "type": "POWER",
+                        "function": "+5V Supply"
+                    }
+                ],
+                "functional": {
+                    "decoderType": "BCD_TO_7SEG",
+                    "displayType": "COMMON_ANODE",
+                    "outputType": "ACTIVE_LOW",
+                    "controlPins": [
+                        {
+                            "pin": 3,
+                            "function": "LAMP_TEST",
+                            "activeLow": true
+                        },
+                        {
+                            "pin": 4,
+                            "function": "BLANKING",
+                            "activeLow": true
+                        },
+                        {
+                            "pin": 5,
+                            "function": "RIPPLE_BLANKING",
+                            "activeLow": true
+                        }
+                    ],
+                    "truthTable": [
+                        {
+                            "BCD": "0000",
+                            "LT": 1,
+                            "BI": 1,
+                            "RBI": 1,
+                            "Segments": "0000001"
+                        },
+                        {
+                            "BCD": "0001",
+                            "LT": 1,
+                            "BI": 1,
+                            "RBI": 1,
+                            "Segments": "1001111"
+                        },
+                        {
+                            "BCD": "0010",
+                            "LT": 1,
+                            "BI": 1,
+                            "RBI": 1,
+                            "Segments": "0010010"
+                        },
+                        {
+                            "BCD": "0011",
+                            "LT": 1,
+                            "BI": 1,
+                            "RBI": 1,
+                            "Segments": "0000110"
+                        },
+                        {
+                            "BCD": "0100",
+                            "LT": 1,
+                            "BI": 1,
+                            "RBI": 1,
+                            "Segments": "1001100"
+                        },
+                        {
+                            "BCD": "0101",
+                            "LT": 1,
+                            "BI": 1,
+                            "RBI": 1,
+                            "Segments": "0100100"
+                        },
+                        {
+                            "BCD": "0110",
+                            "LT": 1,
+                            "BI": 1,
+                            "RBI": 1,
+                            "Segments": "0100000"
+                        },
+                        {
+                            "BCD": "0111",
+                            "LT": 1,
+                            "BI": 1,
+                            "RBI": 1,
+                            "Segments": "0001111"
+                        },
+                        {
+                            "BCD": "1000",
+                            "LT": 1,
+                            "BI": 1,
+                            "RBI": 1,
+                            "Segments": "0000000"
+                        },
+                        {
+                            "BCD": "1001",
+                            "LT": 1,
+                            "BI": 1,
+                            "RBI": 1,
+                            "Segments": "0000100"
+                        }
+                    ],
+                    "features": [
+                        "Open-collector outputs",
+                        "Lamp test capability",
+                        "Leading/trailing zero suppression",
+                        "15V output withstand voltage"
+                    ]
+                },
+                "electrical": {
+                    "voltageRange": "4.75V to 5.25V",
+                    "inputHighVoltage": "2.0V min",
+                    "inputLowVoltage": "0.8V max",
+                    "outputCurrent": "24mA max",
+                    "propagationDelay": "100ns typ"
+                }
+            },
+            "7448": {
+                "partNumber": "7448",
+                "description": "BCD to 7-Segment Decoder/Driver (Common Cathode)",
+                "category": "BCD_DECODER",
+                "pinCount": 16,
+                "pinConfiguration": [
+                    {
+                        "pin": 1,
+                        "name": "B",
+                        "type": "INPUT",
+                        "function": "BCD Input B"
+                    },
+                    {
+                        "pin": 2,
+                        "name": "C",
+                        "type": "INPUT",
+                        "function": "BCD Input C"
+                    },
+                    {
+                        "pin": 3,
+                        "name": "LT",
+                        "type": "INPUT",
+                        "function": "Lamp Test (Active Low)"
+                    },
+                    {
+                        "pin": 4,
+                        "name": "BI/RBO",
+                        "type": "IO",
+                        "function": "Blanking Input/Ripple Blanking Output"
+                    },
+                    {
+                        "pin": 5,
+                        "name": "RBI",
+                        "type": "INPUT",
+                        "function": "Ripple Blanking Input (Active Low)"
+                    },
+                    {
+                        "pin": 6,
+                        "name": "D",
+                        "type": "INPUT",
+                        "function": "BCD Input D"
+                    },
+                    {
+                        "pin": 7,
+                        "name": "A",
+                        "type": "INPUT",
+                        "function": "BCD Input A"
+                    },
+                    {
+                        "pin": 8,
+                        "name": "GND",
+                        "type": "POWER",
+                        "function": "Ground"
+                    },
+                    {
+                        "pin": 9,
+                        "name": "e",
+                        "type": "OUTPUT",
+                        "function": "Segment e (Active High)"
+                    },
+                    {
+                        "pin": 10,
+                        "name": "d",
+                        "type": "OUTPUT",
+                        "function": "Segment d (Active High)"
+                    },
+                    {
+                        "pin": 11,
+                        "name": "c",
+                        "type": "OUTPUT",
+                        "function": "Segment c (Active High)"
+                    },
+                    {
+                        "pin": 12,
+                        "name": "b",
+                        "type": "OUTPUT",
+                        "function": "Segment b (Active High)"
+                    },
+                    {
+                        "pin": 13,
+                        "name": "a",
+                        "type": "OUTPUT",
+                        "function": "Segment a (Active High)"
+                    },
+                    {
+                        "pin": 14,
+                        "name": "g",
+                        "type": "OUTPUT",
+                        "function": "Segment g (Active High)"
+                    },
+                    {
+                        "pin": 15,
+                        "name": "f",
+                        "type": "OUTPUT",
+                        "function": "Segment f (Active High)"
+                    },
+                    {
+                        "pin": 16,
+                        "name": "VCC",
+                        "type": "POWER",
+                        "function": "+5V Supply"
+                    }
+                ],
+                "functional": {
+                    "decoderType": "BCD_TO_7SEG",
+                    "displayType": "COMMON_CATHODE",
+                    "outputType": "ACTIVE_HIGH",
+                    "controlPins": [
+                        {
+                            "pin": 3,
+                            "function": "LAMP_TEST",
+                            "activeLow": true
+                        },
+                        {
+                            "pin": 4,
+                            "function": "BLANKING",
+                            "activeLow": true
+                        },
+                        {
+                            "pin": 5,
+                            "function": "RIPPLE_BLANKING",
+                            "activeLow": true
+                        }
+                    ],
+                    "truthTable": [
+                        {
+                            "BCD": "0000",
+                            "LT": 1,
+                            "BI": 1,
+                            "RBI": 1,
+                            "Segments": "1111110"
+                        },
+                        {
+                            "BCD": "0001",
+                            "LT": 1,
+                            "BI": 1,
+                            "RBI": 1,
+                            "Segments": "0110000"
+                        },
+                        {
+                            "BCD": "0010",
+                            "LT": 1,
+                            "BI": 1,
+                            "RBI": 1,
+                            "Segments": "1101101"
+                        },
+                        {
+                            "BCD": "0011",
+                            "LT": 1,
+                            "BI": 1,
+                            "RBI": 1,
+                            "Segments": "1111001"
+                        },
+                        {
+                            "BCD": "0100",
+                            "LT": 1,
+                            "BI": 1,
+                            "RBI": 1,
+                            "Segments": "0110011"
+                        },
+                        {
+                            "BCD": "0101",
+                            "LT": 1,
+                            "BI": 1,
+                            "RBI": 1,
+                            "Segments": "1011011"
+                        },
+                        {
+                            "BCD": "0110",
+                            "LT": 1,
+                            "BI": 1,
+                            "RBI": 1,
+                            "Segments": "1011111"
+                        },
+                        {
+                            "BCD": "0111",
+                            "LT": 1,
+                            "BI": 1,
+                            "RBI": 1,
+                            "Segments": "1110000"
+                        },
+                        {
+                            "BCD": "1000",
+                            "LT": 1,
+                            "BI": 1,
+                            "RBI": 1,
+                            "Segments": "1111111"
+                        },
+                        {
+                            "BCD": "1001",
+                            "LT": 1,
+                            "BI": 1,
+                            "RBI": 1,
+                            "Segments": "1111011"
+                        }
+                    ],
+                    "features": [
+                        "Totem-pole outputs",
+                        "Lamp test capability",
+                        "Leading/trailing zero suppression",
+                        "Direct LED driving capability"
+                    ]
+                },
+                "electrical": {
+                    "voltageRange": "4.75V to 5.25V",
+                    "inputHighVoltage": "2.0V min",
+                    "inputLowVoltage": "0.8V max",
+                    "outputCurrent": "6mA max",
+                    "propagationDelay": "85ns typ"
+                }
+            }
+        }
+    }
+}

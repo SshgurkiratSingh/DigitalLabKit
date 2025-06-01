@@ -1,0 +1,312 @@
+{
+    "74SeriesICs": {
+        "SHIFT_REGISTERS": {
+            "74HC194": {
+                "partNumber": "74HC194",
+                "description": "4-bit Bidirectional Universal Shift Register",
+                "category": "SHIFT_REGISTER",
+                "pinCount": 16,
+                "pinConfiguration": [
+                    {
+                        "pin": 1,
+                        "name": "MR",
+                        "type": "INPUT",
+                        "function": "Master Reset (active low)"
+                    },
+                    {
+                        "pin": 2,
+                        "name": "DSR",
+                        "type": "INPUT",
+                        "function": "Serial Data Input (Right Shift)"
+                    },
+                    {
+                        "pin": 3,
+                        "name": "D0",
+                        "type": "INPUT",
+                        "function": "Parallel Data Input 0"
+                    },
+                    {
+                        "pin": 4,
+                        "name": "D1",
+                        "type": "INPUT",
+                        "function": "Parallel Data Input 1"
+                    },
+                    {
+                        "pin": 5,
+                        "name": "D2",
+                        "type": "INPUT",
+                        "function": "Parallel Data Input 2"
+                    },
+                    {
+                        "pin": 6,
+                        "name": "D3",
+                        "type": "INPUT",
+                        "function": "Parallel Data Input 3"
+                    },
+                    {
+                        "pin": 7,
+                        "name": "DSL",
+                        "type": "INPUT",
+                        "function": "Serial Data Input (Left Shift)"
+                    },
+                    {
+                        "pin": 8,
+                        "name": "GND",
+                        "type": "POWER",
+                        "function": "Ground"
+                    },
+                    {
+                        "pin": 9,
+                        "name": "S0",
+                        "type": "INPUT",
+                        "function": "Mode Select 0"
+                    },
+                    {
+                        "pin": 10,
+                        "name": "S1",
+                        "type": "INPUT",
+                        "function": "Mode Select 1"
+                    },
+                    {
+                        "pin": 11,
+                        "name": "CP",
+                        "type": "INPUT",
+                        "function": "Clock Pulse (rising edge)"
+                    },
+                    {
+                        "pin": 12,
+                        "name": "Q3",
+                        "type": "OUTPUT",
+                        "function": "Parallel Output 3"
+                    },
+                    {
+                        "pin": 13,
+                        "name": "Q2",
+                        "type": "OUTPUT",
+                        "function": "Parallel Output 2"
+                    },
+                    {
+                        "pin": 14,
+                        "name": "Q1",
+                        "type": "OUTPUT",
+                        "function": "Parallel Output 1"
+                    },
+                    {
+                        "pin": 15,
+                        "name": "Q0",
+                        "type": "OUTPUT",
+                        "function": "Parallel Output 0"
+                    },
+                    {
+                        "pin": 16,
+                        "name": "VCC",
+                        "type": "POWER",
+                        "function": "+5V Supply"
+                    }
+                ],
+                "functional": {
+                    "registerType": "UNIVERSAL",
+                    "modes": [
+                        {
+                            "S1": 0,
+                            "S0": 0,
+                            "Operation": "Hold (Inhibit Clock)"
+                        },
+                        {
+                            "S1": 0,
+                            "S0": 1,
+                            "Operation": "Shift Right (Q0→Q3)"
+                        },
+                        {
+                            "S1": 1,
+                            "S0": 0,
+                            "Operation": "Shift Left (Q3→Q0)"
+                        },
+                        {
+                            "S1": 1,
+                            "S0": 1,
+                            "Operation": "Parallel Load"
+                        }
+                    ],
+                    "truthTable": [
+                        {
+                            "MR": 0,
+                            "CP": "X",
+                            "Action": "Reset All Outputs to Low"
+                        },
+                        {
+                            "MR": 1,
+                            "S1": 1,
+                            "S0": 1,
+                            "CP": "↑",
+                            "Action": "Load Parallel Data"
+                        },
+                        {
+                            "MR": 1,
+                            "S1": 0,
+                            "S0": 1,
+                            "CP": "↑",
+                            "Action": "Shift Right"
+                        },
+                        {
+                            "MR": 1,
+                            "S1": 1,
+                            "S0": 0,
+                            "CP": "↑",
+                            "Action": "Shift Left"
+                        }
+                    ],
+                    "timingSpecs": {
+                        "setupTime": "20ns",
+                        "holdTime": "5ns",
+                        "propagationDelay": "25ns"
+                    }
+                }
+            },
+            "74HC595": {
+                "partNumber": "74HC595",
+                "description": "8-bit Serial-in, Parallel-out Shift Register",
+                "category": "SHIFT_REGISTER",
+                "pinCount": 16,
+                "pinConfiguration": [
+                    {
+                        "pin": 1,
+                        "name": "Q1",
+                        "type": "OUTPUT",
+                        "function": "Parallel Output 1"
+                    },
+                    {
+                        "pin": 2,
+                        "name": "Q2",
+                        "type": "OUTPUT",
+                        "function": "Parallel Output 2"
+                    },
+                    {
+                        "pin": 3,
+                        "name": "Q3",
+                        "type": "OUTPUT",
+                        "function": "Parallel Output 3"
+                    },
+                    {
+                        "pin": 4,
+                        "name": "Q4",
+                        "type": "OUTPUT",
+                        "function": "Parallel Output 4"
+                    },
+                    {
+                        "pin": 5,
+                        "name": "Q5",
+                        "type": "OUTPUT",
+                        "function": "Parallel Output 5"
+                    },
+                    {
+                        "pin": 6,
+                        "name": "Q6",
+                        "type": "OUTPUT",
+                        "function": "Parallel Output 6"
+                    },
+                    {
+                        "pin": 7,
+                        "name": "Q7",
+                        "type": "OUTPUT",
+                        "function": "Parallel Output 7"
+                    },
+                    {
+                        "pin": 8,
+                        "name": "GND",
+                        "type": "POWER",
+                        "function": "Ground"
+                    },
+                    {
+                        "pin": 9,
+                        "name": "Q7S",
+                        "type": "OUTPUT",
+                        "function": "Serial Output (for cascading)"
+                    },
+                    {
+                        "pin": 10,
+                        "name": "MR",
+                        "type": "INPUT",
+                        "function": "Master Reset (active low)"
+                    },
+                    {
+                        "pin": 11,
+                        "name": "SCLK",
+                        "type": "INPUT",
+                        "function": "Shift Register Clock"
+                    },
+                    {
+                        "pin": 12,
+                        "name": "RCLK",
+                        "type": "INPUT",
+                        "function": "Storage Register Clock"
+                    },
+                    {
+                        "pin": 13,
+                        "name": "OE",
+                        "type": "INPUT",
+                        "function": "Output Enable (active low)"
+                    },
+                    {
+                        "pin": 14,
+                        "name": "SER",
+                        "type": "INPUT",
+                        "function": "Serial Data Input"
+                    },
+                    {
+                        "pin": 15,
+                        "name": "Q0",
+                        "type": "OUTPUT",
+                        "function": "Parallel Output 0"
+                    },
+                    {
+                        "pin": 16,
+                        "name": "VCC",
+                        "type": "POWER",
+                        "function": "+5V Supply"
+                    }
+                ],
+                "functional": {
+                    "registerType": "SERIAL_TO_PARALLEL",
+                    "modes": [
+                        {
+                            "OE": 0,
+                            "Operation": "Outputs Enabled"
+                        },
+                        {
+                            "OE": 1,
+                            "Operation": "Outputs High-Z"
+                        }
+                    ],
+                    "truthTable": [
+                        {
+                            "MR": 0,
+                            "Action": "Clear Shift Register"
+                        },
+                        {
+                            "MR": 1,
+                            "SCLK": "↑",
+                            "Action": "Shift Data In"
+                        },
+                        {
+                            "RCLK": "↑",
+                            "Action": "Latch to Outputs"
+                        }
+                    ],
+                    "timingSpecs": {
+                        "shiftFrequency": "25MHz max",
+                        "setupTime": "15ns",
+                        "propagationDelay": "20ns"
+                    }
+                }
+            }
+        },
+        "ELECTRICAL_SPECS": {
+            "voltageRange": "2.0V to 6.0V",
+            "inputHighVoltage": "3.15V min @ VCC=4.5V",
+            "inputLowVoltage": "1.35V max @ VCC=4.5V",
+            "outputCurrent": "±6mA",
+            "powerConsumption": "80μA typical"
+        }
+    }
+}
