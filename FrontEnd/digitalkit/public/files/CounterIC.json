@@ -1,130 +1,418 @@
 {
-    "74SeriesICs": {
-      "COUNTERS": {
-        "74LS191": {
-          "partNumber": "74LS191",
-          "description": "4-bit Synchronous Up/Down Binary Counter",
-          "category": "COUNTER",
-          "pinCount": 16,
-          "pinConfiguration": [
-            {"pin": 1, "name": "B", "type": "INPUT", "function": "Parallel data input B"},
-            {"pin": 2, "name": "QB", "type": "OUTPUT", "function": "Flip-flop output B"},
-            {"pin": 3, "name": "QA", "type": "OUTPUT", "function": "Flip-flop output A"},
-            {"pin": 4, "name": "CTEN", "type": "INPUT", "function": "Count enable (active low)"},
-            {"pin": 5, "name": "D/U", "type": "INPUT", "function": "Down/Up control (active low)"},
-            {"pin": 6, "name": "QC", "type": "OUTPUT", "function": "Flip-flop output C"},
-            {"pin": 7, "name": "QD", "type": "OUTPUT", "function": "Flip-flop output D"},
-            {"pin": 8, "name": "GND", "type": "POWER", "function": "Ground"},
-            {"pin": 9, "name": "D", "type": "INPUT", "function": "Parallel data input D"},
-            {"pin": 10, "name": "C", "type": "INPUT", "function": "Parallel data input C"},
-            {"pin": 11, "name": "LOAD", "type": "INPUT", "function": "Parallel load (active low)"},
-            {"pin": 12, "name": "MAX/MIN", "type": "OUTPUT", "function": "Terminal count output"},
-            {"pin": 13, "name": "RCO", "type": "OUTPUT", "function": "Ripple clock output"},
-            {"pin": 14, "name": "CLK", "type": "INPUT", "function": "Clock pulse input"},
-            {"pin": 15, "name": "A", "type": "INPUT", "function": "Parallel data input A"},
-            {"pin": 16, "name": "VCC", "type": "POWER", "function": "+5V Supply"}
-          ],
-          "functional": {
-            "counterType": "BINARY",
-            "modes": ["UP", "DOWN", "PARALLEL_LOAD"],
-            "maxCount": 15,
-            "truthTable": [
-              {"LOAD": 0, "CTEN": "X", "CLK": "↑", "Action": "Parallel Load"},
-              {"LOAD": 1, "CTEN": 0, "D/U": 0, "CLK": "↑", "Action": "Count Up"},
-              {"LOAD": 1, "CTEN": 0, "D/U": 1, "CLK": "↑", "Action": "Count Down"},
-              {"LOAD": 1, "CTEN": 1, "CLK": "X", "Action": "Hold"}
-            ],
-            "timingSpecs": {
-              "setupTime": "20ns",
-              "holdTime": "5ns",
-              "propagationDelay": "25ns"
-            }
+  "74SeriesICs": {
+    "COUNTERS": {
+      "74LS191": {
+        "partNumber": "74LS191",
+        "description": "4-bit Synchronous Up/Down Binary Counter",
+        "category": "COUNTER",
+        "pinCount": 16,
+        "pinConfiguration": [
+          {
+            "pin": 1,
+            "name": "B",
+            "type": "INPUT",
+            "function": "Parallel data input B"
+          },
+          {
+            "pin": 2,
+            "name": "QB",
+            "type": "OUTPUT",
+            "function": "Flip-flop output B"
+          },
+          {
+            "pin": 3,
+            "name": "QA",
+            "type": "OUTPUT",
+            "function": "Flip-flop output A"
+          },
+          {
+            "pin": 4,
+            "name": "CTEN",
+            "type": "INPUT",
+            "function": "Count enable (active low)"
+          },
+          {
+            "pin": 5,
+            "name": "D/U",
+            "type": "INPUT",
+            "function": "Down/Up control (active low)"
+          },
+          {
+            "pin": 6,
+            "name": "QC",
+            "type": "OUTPUT",
+            "function": "Flip-flop output C"
+          },
+          {
+            "pin": 7,
+            "name": "QD",
+            "type": "OUTPUT",
+            "function": "Flip-flop output D"
+          },
+          {
+            "pin": 8,
+            "name": "GND",
+            "type": "POWER",
+            "function": "Ground"
+          },
+          {
+            "pin": 9,
+            "name": "D",
+            "type": "INPUT",
+            "function": "Parallel data input D"
+          },
+          {
+            "pin": 10,
+            "name": "C",
+            "type": "INPUT",
+            "function": "Parallel data input C"
+          },
+          {
+            "pin": 11,
+            "name": "LOAD",
+            "type": "INPUT",
+            "function": "Parallel load (active low)"
+          },
+          {
+            "pin": 12,
+            "name": "MAX/MIN",
+            "type": "OUTPUT",
+            "function": "Terminal count output"
+          },
+          {
+            "pin": 13,
+            "name": "RCO",
+            "type": "OUTPUT",
+            "function": "Ripple clock output"
+          },
+          {
+            "pin": 14,
+            "name": "CLK",
+            "type": "INPUT",
+            "function": "Clock pulse input"
+          },
+          {
+            "pin": 15,
+            "name": "A",
+            "type": "INPUT",
+            "function": "Parallel data input A"
+          },
+          {
+            "pin": 16,
+            "name": "VCC",
+            "type": "POWER",
+            "function": "+5V Supply"
           }
-        },
-        "74LS192": {
-          "partNumber": "74LS192",
-          "description": "Synchronous Up/Down Decade Counter",
-          "category": "COUNTER",
-          "pinCount": 16,
-          "pinConfiguration": [
-            {"pin": 1, "name": "B", "type": "INPUT", "function": "Parallel data input B"},
-            {"pin": 2, "name": "QB", "type": "OUTPUT", "function": "Flip-flop output B"},
-            {"pin": 3, "name": "QA", "type": "OUTPUT", "function": "Flip-flop output A"},
-            {"pin": 4, "name": "DOWN", "type": "INPUT", "function": "Count down clock input"},
-            {"pin": 5, "name": "UP", "type": "INPUT", "function": "Count up clock input"},
-            {"pin": 6, "name": "QC", "type": "OUTPUT", "function": "Flip-flop output C"},
-            {"pin": 7, "name": "QD", "type": "OUTPUT", "function": "Flip-flop output D"},
-            {"pin": 8, "name": "GND", "type": "POWER", "function": "Ground"},
-            {"pin": 9, "name": "D", "type": "INPUT", "function": "Parallel data input D"},
-            {"pin": 10, "name": "C", "type": "INPUT", "function": "Parallel data input C"},
-            {"pin": 11, "name": "LOAD", "type": "INPUT", "function": "Parallel load (active low)"},
-            {"pin": 12, "name": "BO", "type": "OUTPUT", "function": "Borrow output (active low)"},
-            {"pin": 13, "name": "CO", "type": "OUTPUT", "function": "Carry output (active low)"},
-            {"pin": 14, "name": "CLR", "type": "INPUT", "function": "Master reset (active high)"},
-            {"pin": 15, "name": "A", "type": "INPUT", "function": "Parallel data input A"},
-            {"pin": 16, "name": "VCC", "type": "POWER", "function": "+5V Supply"}
+        ],
+        "functional": {
+          "counterType": "BINARY",
+          "modes": [
+            "UP",
+            "DOWN",
+            "PARALLEL_LOAD"
           ],
-          "functional": {
-            "counterType": "DECADE",
-            "modes": ["UP", "DOWN", "PARALLEL_LOAD", "CLEAR"],
-            "maxCount": 9,
-            "truthTable": [
-              {"CLR": 1, "Action": "Reset to 0000"},
-              {"CLR": 0, "LOAD": 0, "Action": "Parallel Load"},
-              {"CLR": 0, "LOAD": 1, "UP": "↑", "DOWN": 1, "Action": "Count Up"},
-              {"CLR": 0, "LOAD": 1, "UP": 1, "DOWN": "↑", "Action": "Count Down"}
-            ],
-            "timingSpecs": {
-              "setupTime": "25ns",
-              "holdTime": "5ns",
-              "propagationDelay": "30ns"
+          "maxCount": 15,
+          "truthTable": [
+            {
+              "LOAD": 0,
+              "CTEN": "X",
+              "CLK": "↑",
+              "Action": "Parallel Load"
+            },
+            {
+              "LOAD": 1,
+              "CTEN": 0,
+              "D/U": 0,
+              "CLK": "↑",
+              "Action": "Count Up"
+            },
+            {
+              "LOAD": 1,
+              "CTEN": 0,
+              "D/U": 1,
+              "CLK": "↑",
+              "Action": "Count Down"
+            },
+            {
+              "LOAD": 1,
+              "CTEN": 1,
+              "CLK": "X",
+              "Action": "Hold"
             }
-          }
-        },
-        "74LS90": {
-          "partNumber": "74LS90",
-          "description": "Asynchronous Decade Counter",
-          "category": "COUNTER",
-          "pinCount": 14,
-          "pinConfiguration": [
-            {"pin": 1, "name": "CLKB", "type": "INPUT", "function": "Clock input B (divide-by-5)"},
-            {"pin": 2, "name": "R1", "type": "INPUT", "function": "Reset 1 (active high)"},
-            {"pin": 3, "name": "R2", "type": "INPUT", "function": "Reset 2 (active high)"},
-            {"pin": 4, "name": "NC", "type": "NC", "function": "No connection"},
-            {"pin": 5, "name": "VCC", "type": "POWER", "function": "+5V Supply"},
-            {"pin": 6, "name": "R3", "type": "INPUT", "function": "Reset 3 (active high)"},
-            {"pin": 7, "name": "R4", "type": "INPUT", "function": "Reset 4 (active high)"},
-            {"pin": 8, "name": "QC", "type": "OUTPUT", "function": "Flip-flop output C"},
-            {"pin": 9, "name": "QB", "type": "OUTPUT", "function": "Flip-flop output B"},
-            {"pin": 10, "name": "GND", "type": "POWER", "function": "Ground"},
-            {"pin": 11, "name": "QD", "type": "OUTPUT", "function": "Flip-flop output D"},
-            {"pin": 12, "name": "QA", "type": "OUTPUT", "function": "Flip-flop output A"},
-            {"pin": 13, "name": "NC", "type": "NC", "function": "No connection"},
-            {"pin": 14, "name": "CLKA", "type": "INPUT", "function": "Clock input A (divide-by-2)"}
           ],
-          "functional": {
-            "counterType": "DECADE",
-            "modes": ["DIVIDE_BY_2", "DIVIDE_BY_5", "DIVIDE_BY_10"],
-            "maxCount": 9,
-            "truthTable": [
-              {"R1&R2": 1, "R3&R4": 0, "Action": "Reset to 0000"},
-              {"R1&R2": 0, "R3&R4": 1, "Action": "Set to 1001"},
-              {"R1&R2": 0, "R3&R4": 0, "Action": "Normal Counting"}
-            ],
-            "timingSpecs": {
-              "maxClockFrequency": "42MHz",
-              "propagationDelay": "40ns"
-            }
+          "timingSpecs": {
+            "setupTime": "20ns",
+            "holdTime": "5ns",
+            "propagationDelay": "25ns"
           }
         }
       },
-      "ELECTRICAL_SPECS": {
-        "voltageRange": "4.75V to 5.25V",
-        "inputHighVoltage": "2.0V min",
-        "inputLowVoltage": "0.8V max",
-        "outputCurrent": "8mA sink/0.4mA source",
-        "powerConsumption": "45mW typical"
+      "74LS192": {
+        "partNumber": "74LS192",
+        "description": "Synchronous Up/Down Decade Counter",
+        "category": "COUNTER",
+        "pinCount": 16,
+        "pinConfiguration": [
+          {
+            "pin": 1,
+            "name": "B",
+            "type": "INPUT",
+            "function": "Parallel data input B"
+          },
+          {
+            "pin": 2,
+            "name": "QB",
+            "type": "OUTPUT",
+            "function": "Flip-flop output B"
+          },
+          {
+            "pin": 3,
+            "name": "QA",
+            "type": "OUTPUT",
+            "function": "Flip-flop output A"
+          },
+          {
+            "pin": 4,
+            "name": "DOWN",
+            "type": "INPUT",
+            "function": "Count down clock input"
+          },
+          {
+            "pin": 5,
+            "name": "UP",
+            "type": "INPUT",
+            "function": "Count up clock input"
+          },
+          {
+            "pin": 6,
+            "name": "QC",
+            "type": "OUTPUT",
+            "function": "Flip-flop output C"
+          },
+          {
+            "pin": 7,
+            "name": "QD",
+            "type": "OUTPUT",
+            "function": "Flip-flop output D"
+          },
+          {
+            "pin": 8,
+            "name": "GND",
+            "type": "POWER",
+            "function": "Ground"
+          },
+          {
+            "pin": 9,
+            "name": "D",
+            "type": "INPUT",
+            "function": "Parallel data input D"
+          },
+          {
+            "pin": 10,
+            "name": "C",
+            "type": "INPUT",
+            "function": "Parallel data input C"
+          },
+          {
+            "pin": 11,
+            "name": "LOAD",
+            "type": "INPUT",
+            "function": "Parallel load (active low)"
+          },
+          {
+            "pin": 12,
+            "name": "BO",
+            "type": "OUTPUT",
+            "function": "Borrow output (active low)"
+          },
+          {
+            "pin": 13,
+            "name": "CO",
+            "type": "OUTPUT",
+            "function": "Carry output (active low)"
+          },
+          {
+            "pin": 14,
+            "name": "CLR",
+            "type": "INPUT",
+            "function": "Master reset (active high)"
+          },
+          {
+            "pin": 15,
+            "name": "A",
+            "type": "INPUT",
+            "function": "Parallel data input A"
+          },
+          {
+            "pin": 16,
+            "name": "VCC",
+            "type": "POWER",
+            "function": "+5V Supply"
+          }
+        ],
+        "functional": {
+          "counterType": "DECADE",
+          "modes": [
+            "UP",
+            "DOWN",
+            "PARALLEL_LOAD",
+            "CLEAR"
+          ],
+          "maxCount": 9,
+          "truthTable": [
+            {
+              "CLR": 1,
+              "Action": "Reset to 0000"
+            },
+            {
+              "CLR": 0,
+              "LOAD": 0,
+              "Action": "Parallel Load"
+            },
+            {
+              "CLR": 0,
+              "LOAD": 1,
+              "UP": "↑",
+              "DOWN": 1,
+              "Action": "Count Up"
+            },
+            {
+              "CLR": 0,
+              "LOAD": 1,
+              "UP": 1,
+              "DOWN": "↑",
+              "Action": "Count Down"
+            }
+          ],
+          "timingSpecs": {
+            "setupTime": "25ns",
+            "holdTime": "5ns",
+            "propagationDelay": "30ns"
+          }
+        }
+      },
+      "74LS90": {
+        "partNumber": "74LS90",
+        "description": "Asynchronous Decade Counter",
+        "category": "COUNTER",
+        "pinCount": 14,
+        "pinConfiguration": [
+          {
+            "pin": 1,
+            "name": "CLKB",
+            "type": "INPUT",
+            "function": "Clock input B (divide-by-5)"
+          },
+          {
+            "pin": 2,
+            "name": "R1",
+            "type": "INPUT",
+            "function": "Reset 1 (active high)"
+          },
+          {
+            "pin": 3,
+            "name": "R2",
+            "type": "INPUT",
+            "function": "Reset 2 (active high)"
+          },
+          {
+            "pin": 4,
+            "name": "NC",
+            "type": "NC",
+            "function": "No connection"
+          },
+          {
+            "pin": 5,
+            "name": "VCC",
+            "type": "POWER",
+            "function": "+5V Supply"
+          },
+          {
+            "pin": 6,
+            "name": "R3",
+            "type": "INPUT",
+            "function": "Reset 3 (active high)"
+          },
+          {
+            "pin": 7,
+            "name": "R4",
+            "type": "INPUT",
+            "function": "Reset 4 (active high)"
+          },
+          {
+            "pin": 8,
+            "name": "QC",
+            "type": "OUTPUT",
+            "function": "Flip-flop output C"
+          },
+          {
+            "pin": 9,
+            "name": "QB",
+            "type": "OUTPUT",
+            "function": "Flip-flop output B"
+          },
+          {
+            "pin": 10,
+            "name": "GND",
+            "type": "POWER",
+            "function": "Ground"
+          },
+          {
+            "pin": 11,
+            "name": "QD",
+            "type": "OUTPUT",
+            "function": "Flip-flop output D"
+          },
+          {
+            "pin": 12,
+            "name": "QA",
+            "type": "OUTPUT",
+            "function": "Flip-flop output A"
+          },
+          {
+            "pin": 13,
+            "name": "NC",
+            "type": "NC",
+            "function": "No connection"
+          },
+          {
+            "pin": 14,
+            "name": "CLKA",
+            "type": "INPUT",
+            "function": "Clock input A (divide-by-2)"
+          }
+        ],
+        "functional": {
+          "counterType": "DECADE",
+          "modes": [
+            "DIVIDE_BY_2",
+            "DIVIDE_BY_5",
+            "DIVIDE_BY_10"
+          ],
+          "maxCount": 9,
+          "truthTable": [
+            {
+              "R1&R2": 1,
+              "R3&R4": 0,
+              "Action": "Reset to 0000"
+            },
+            {
+              "R1&R2": 0,
+              "R3&R4": 1,
+              "Action": "Set to 1001"
+            },
+            {
+              "R1&R2": 0,
+              "R3&R4": 0,
+              "Action": "Normal Counting"
+            }
+          ],
+          "timingSpecs": {
+            "maxClockFrequency": "42MHz",
+            "propagationDelay": "40ns"
+          }
+        }
       }
     }
   }
-  
+}

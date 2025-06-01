@@ -28,11 +28,9 @@ export default function ICSelector({
 }: {
   onICSelect: (ic: ICData | null) => void;
 }) {
-  const [icFiles, setICFiles] = useState<{ [key: string]: ICFile }>({});
-  const [selectedFile, setSelectedFile] = useState<string>("");
-  const [selectedCategory, setSelectedCategory] = useState<string>("");
-  const [selectedSubCategory, setSelectedSubCategory] = useState<string>("");
+  const [allICs, setAllICs] = useState<ICData[]>([]);
   const [selectedIC, setSelectedIC] = useState<string>("");
+  const [searchTerm, setSearchTerm] = useState<string>("");
 
   useEffect(() => {
     const loadICFiles = async () => {
@@ -46,138 +44,110 @@ export default function ICSelector({
         "sequentialIC",
       ];
 
-      const loadedFiles: { [key: string]: ICFile } = {};
+      const ics: ICData[] = [];
       for (const file of files) {
-        const response = await fetch(`/files/${file}.json`);
-        const data = await response.json();
-        loadedFiles[file] = data;
+        try {
+          const response = await fetch(`/files/${file}.json`);
+          if (!response.ok) {
+            console.error(`Failed to load ${file}.json:`, response.statusText);
+            continue;
+          }
+          const data: ICFile = await response.json();
+          
+          // Flatten the nested structure and extract all ICs
+          const extractICs = (obj: any) => {
+            if (obj && typeof obj === 'object') {
+              if ('partNumber' in obj) {
+                ics.push(obj);
+              } else {
+                Object.values(obj).forEach(value => extractICs(value));
+              }
+            }
+          };
+          
+          extractICs(data);
+        } catch (error) {
+          console.error(`Error loading ${file}.json:`, error);
+        }
       }
-      setICFiles(loadedFiles);
+
+      // Sort ICs numerically by part number
+      ics.sort((a, b) => {
+        const aNum = parseInt(a.partNumber.match(/\d+/)?.[0] || '0');
+        const bNum = parseInt(b.partNumber.match(/\d+/)?.[0] || '0');
+        return aNum - bNum || a.partNumber.localeCompare(b.partNumber);
+      });
+      
+      console.log('Loaded ICs:', ics);
+      setAllICs(ics);
     };
 
     loadICFiles();
   }, []);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    setSelectedFile(e.target.value);
-    setSelectedCategory("");
-    setSelectedSubCategory("");
-    setSelectedIC("");
-    onICSelect(null);
-  };
-
-  const handleCategoryChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    setSelectedCategory(e.target.value);
-    setSelectedSubCategory("");
-    setSelectedIC("");
-    onICSelect(null);
-  };
-
-  const handleSubCategoryChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    setSelectedSubCategory(e.target.value);
-    setSelectedIC("");
-    onICSelect(null);
-  };
-
   const handleICChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const icName = e.target.value;
     setSelectedIC(icName);
     
-    if (icName && selectedFile && selectedCategory && selectedSubCategory) {
-      const ic = icFiles[selectedFile][selectedCategory][selectedSubCategory][icName];
-      onICSelect(ic);
+    if (icName) {
+      const ic = allICs.find(ic => ic.partNumber === icName);
+      onICSelect(ic || null);
     } else {
       onICSelect(null);
     }
   };
 
+  const filteredICs = allICs.filter(ic => 
+    ic.partNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    ic.description.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
   return (
     <div className="space-y-4">
       <div>
         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-          IC Family
+          Search IC
         </label>
-        <select
+        <input
+          type="text"
           className="w-full p-2 border rounded dark:bg-gray-700 dark:text-white dark:border-gray-600"
-          value={selectedFile}
-          onChange={handleFileChange}
-        >
-          <option value="">Select IC Family</option>
-          {Object.keys(icFiles).map((file) => (
-            <option key={file} value={file}>
-              {file.replace(/IC$|Ic$/, " IC")}
-            </option>
-          ))}
-        </select>
+          placeholder="Search by part number or description..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+        />
       </div>
 
-      {selectedFile && (
-        <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-            Category
-          </label>
-          <select
-            className="w-full p-2 border rounded dark:bg-gray-700 dark:text-white dark:border-gray-600"
-            value={selectedCategory}
-            onChange={handleCategoryChange}
-          >
-            <option value="">Select Category</option>
-            {Object.keys(icFiles[selectedFile]).map((category) => (
-              <option key={category} value={category}>
-                {category}
-              </option>
-            ))}
-          </select>
+      <div>
+        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+          Available ICs
+        </label>
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+          {filteredICs.map((ic) => (
+            <button
+              key={ic.partNumber}
+              onClick={() => {
+                setSelectedIC(ic.partNumber);
+                onICSelect(ic);
+              }}
+              className={`p-2 text-sm text-left border rounded transition-colors
+                ${selectedIC === ic.partNumber
+                  ? 'bg-blue-100 border-blue-500 dark:bg-blue-900 dark:border-blue-400'
+                  : 'hover:bg-gray-100 dark:hover:bg-gray-800 border-gray-200 dark:border-gray-700'}
+                dark:text-white`}
+            >
+              <div className="font-medium">{ic.partNumber}</div>
+              <div className="text-xs text-gray-600 dark:text-gray-400 truncate">
+                {ic.description}
+              </div>
+            </button>
+          ))}
         </div>
-      )}
-
-      {selectedCategory && (
-        <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-            Sub-Category
-          </label>
-          <select
-            className="w-full p-2 border rounded dark:bg-gray-700 dark:text-white dark:border-gray-600"
-            value={selectedSubCategory}
-            onChange={handleSubCategoryChange}
-          >
-            <option value="">Select Sub-Category</option>
-            {Object.keys(icFiles[selectedFile][selectedCategory]).map(
-              (subCategory) => (
-                <option key={subCategory} value={subCategory}>
-                  {subCategory}
-                </option>
-              )
-            )}
-          </select>
-        </div>
-      )}
-
-      {selectedSubCategory && (
-        <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-            IC
-          </label>
-          <select
-            className="w-full p-2 border rounded dark:bg-gray-700 dark:text-white dark:border-gray-600"
-            value={selectedIC}
-            onChange={handleICChange}
-          >
-            <option value="">Select IC</option>
-            {Object.keys(
-              icFiles[selectedFile][selectedCategory][selectedSubCategory]
-            ).map((ic) => (
-              <option key={ic} value={ic}>
-                {ic} -{" "}
-                {
-                  icFiles[selectedFile][selectedCategory][selectedSubCategory][ic]
-                    .description
-                }
-              </option>
-            ))}
-          </select>
-        </div>
-      )}
+        {filteredICs.length === 0 && (
+          <div className="text-center p-4 text-gray-500 dark:text-gray-400">
+            No ICs found matching your search
+          </div>
+        )}
+      </div>
     </div>
   );
 }

@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import ICSelector from "./ICSelector";
 import ICVisualizer from "./ICVisualizer";
+import ICTruthTableVerifier from "./ICTruthTableVerifier";
 
 // Define Web Serial API types
 interface SerialPort {
@@ -70,8 +71,19 @@ export default function SerialPortInterface() {
   const [error, setError] = useState<string | null>(null);
   const [selectedIC, setSelectedIC] = useState<ICData | null>(null);
   const [pinStates, setPinStates] = useState<{ [key: number]: boolean }>({});
-  const writerRef = useRef<WritableStreamDefaultWriter<Uint8Array> | null>(null);
-  const readerRef = useRef<ReadableStreamDefaultReader<Uint8Array> | null>(null);
+  const [debugLogs, setDebugLogs] = useState<Array<{
+    timestamp: string;
+    type: "received" | "sent" | "info" | "error";
+    message: string;
+  }>>([]);
+  const [allICs, setAllICs] = useState<ICData[]>([]);
+  const [syncInterval, setSyncInterval] = useState<NodeJS.Timeout | null>(null);
+  const writerRef = useRef<WritableStreamDefaultWriter<Uint8Array> | null>(
+    null
+  );
+  const readerRef = useRef<ReadableStreamDefaultReader<Uint8Array> | null>(
+    null
+  );
 
   // Check if Web Serial API is supported
   const isSerialSupported = "serial" in navigator;
@@ -121,8 +133,8 @@ export default function SerialPortInterface() {
     }
 
     try {
-      await selectedPort.open({ baudRate: 9600 });
-      
+      await selectedPort.open({ baudRate: 115200 });
+
       // Set up the writer
       if (selectedPort.writable) {
         const writer = selectedPort.writable.getWriter();
@@ -136,11 +148,31 @@ export default function SerialPortInterface() {
         startReading();
       }
 
+      // Start sync interval
+      const interval = setInterval(() => {
+        if (isConnected && selectedIC) {
+          sendData("SYNC\n");
+        }
+      }, 1000); // Sync every second
+      setSyncInterval(interval);
+
       setIsConnected(true);
       setError(null);
+
+      // Add connection log
+      setDebugLogs(prev => [...prev, {
+        timestamp: new Date().toISOString(),
+        type: "info",
+        message: "Connected to serial port"
+      }]);
     } catch (err) {
       setError("Failed to connect to port");
       console.error(err);
+      setDebugLogs(prev => [...prev, {
+        timestamp: new Date().toISOString(),
+        type: "error",
+        message: `Connection failed: ${err}`
+      }]);
     }
   };
 
@@ -149,6 +181,12 @@ export default function SerialPortInterface() {
     if (!selectedPort) return;
 
     try {
+      // Clear sync interval
+      if (syncInterval) {
+        clearInterval(syncInterval);
+        setSyncInterval(null);
+      }
+
       // Release the reader and writer
       if (readerRef.current) {
         await readerRef.current.cancel();
@@ -164,9 +202,21 @@ export default function SerialPortInterface() {
       await selectedPort.close();
       setIsConnected(false);
       setError(null);
+
+      // Add disconnection log
+      setDebugLogs(prev => [...prev, {
+        timestamp: new Date().toISOString(),
+        type: "info",
+        message: "Disconnected from serial port"
+      }]);
     } catch (err) {
       setError("Failed to disconnect from port");
       console.error(err);
+      setDebugLogs(prev => [...prev, {
+        timestamp: new Date().toISOString(),
+        type: "error",
+        message: `Disconnection failed: ${err}`
+      }]);
     }
   };
 
@@ -192,18 +242,122 @@ export default function SerialPortInterface() {
   const handleReceivedData = (data: Uint8Array) => {
     // Convert the received data to a string
     const text = new TextDecoder().decode(data);
+    const lines = text.split('\n').filter(line => line.trim());
     
-    // Parse the pin states from the received data
-    // Expected format: "PINS:0101010101010101" for 16 pins
-    if (text.startsWith("PINS:")) {
-      const pinData = text.substring(5).trim();
-      const newPinStates: { [key: number]: boolean } = {};
-      
-      for (let i = 0; i < pinData.length; i++) {
-        newPinStates[i + 1] = pinData[i] === "1";
+    for (const line of lines) {
+      // Add to debug log
+      const logEntry = {
+        timestamp: new Date().toISOString(),
+        type: "received" as const,
+        message: line.trim()
+      };
+      setDebugLogs(prev => [...prev, logEntry]);
+
+      try {
+        // Parse IC selection from the received data
+        if (line.startsWith("IC:")) {
+          const icNumber = line.substring(3).trim();
+          // Extract initial numeric part from received IC number
+          const numericPart = icNumber.match(/^\d+/)?.[0];
+          if (numericPart) {
+            // Find IC by matching the initial numeric part
+            const matchingIC = allICs.find(ic => ic.partNumber.startsWith(numericPart));
+            if (matchingIC) {
+              // Use a single setState call with a callback to avoid state updates during render
+              setDebugLogs(prev => [...prev, {
+                timestamp: new Date().toISOString(),
+                type: "info",
+                message: `Selected IC ${matchingIC.partNumber} based on received number ${numericPart}`
+              }]);
+              
+              // Update IC selection
+              setSelectedIC(matchingIC);
+              onICSelect(matchingIC);
+              
+              // Request initial pin states
+              sendData("PINS?\n");
+            } else {
+              setDebugLogs(prev => [...prev, {
+                timestamp: new Date().toISOString(),
+                type: "error",
+                message: `No IC found matching number: ${numericPart}`
+              }]);
+            }
+          } else {
+            setDebugLogs(prev => [...prev, {
+              timestamp: new Date().toISOString(),
+              type: "error",
+              message: `Invalid IC number format: ${icNumber}`
+            }]);
+          }
+          continue;
+        }
+
+        // Parse the pin states from the received data
+        if (line.startsWith("PINS:")) {
+          const pinData = line.substring(5).trim();
+          
+          // Validate pin data length (14-16 bits) and format
+          if (pinData.length >= 14 && pinData.length <= 16 && /^[01]+$/.test(pinData)) {
+            const newPinStates: { [key: number]: boolean } = {};
+            
+            // Parse each bit into pin states
+            for (let i = 0; i < pinData.length; i++) {
+              newPinStates[i + 1] = pinData[i] === "1";
+            }
+
+            // Update pin states in a single setState call
+            setPinStates(newPinStates);
+            
+            // Log pin state update
+            setDebugLogs(prev => [...prev, {
+              timestamp: new Date().toISOString(),
+              type: "info",
+              message: `Pin states updated: ${pinData}`
+            }]);
+          } else {
+            setDebugLogs(prev => [...prev, {
+              timestamp: new Date().toISOString(),
+              type: "error",
+              message: `Invalid pin data format: ${pinData}`
+            }]);
+          }
+          continue;
+        }
+
+        // Handle sync response
+        if (line === "SYNC:OK") {
+          setDebugLogs(prev => [...prev, {
+            timestamp: new Date().toISOString(),
+            type: "info",
+            message: "Device synchronized"
+          }]);
+          continue;
+        }
+
+        // Handle error messages
+        if (line.startsWith("ERROR:")) {
+          setDebugLogs(prev => [...prev, {
+            timestamp: new Date().toISOString(),
+            type: "error",
+            message: line.substring(6).trim()
+          }]);
+          continue;
+        }
+
+        // Log any unhandled messages
+        setDebugLogs(prev => [...prev, {
+          timestamp: new Date().toISOString(),
+          type: "info",
+          message: `Unhandled message: ${line}`
+        }]);
+      } catch (error) {
+        setDebugLogs(prev => [...prev, {
+          timestamp: new Date().toISOString(),
+          type: "error",
+          message: `Error processing message: ${error}`
+        }]);
       }
-      
-      setPinStates(newPinStates);
     }
   };
 
@@ -214,8 +368,28 @@ export default function SerialPortInterface() {
     try {
       const encoder = new TextEncoder();
       await writerRef.current.write(encoder.encode(data));
+
+      // Add to debug log
+      setDebugLogs(prev => [...prev, {
+        timestamp: new Date().toISOString(),
+        type: "sent",
+        message: data.trim()
+      }]);
     } catch (error) {
       console.error("Error writing to serial port:", error);
+      setDebugLogs(prev => [...prev, {
+        timestamp: new Date().toISOString(),
+        type: "error",
+        message: `Failed to send data: ${error}`
+      }]);
+    }
+  };
+
+  // Handle clock frequency changes
+  const handleClockFrequencyChange = (frequency: number) => {
+    if (isConnected && selectedIC) {
+      // Send clock frequency command to the device
+      sendData(`CLOCK:${frequency}\n`);
     }
   };
 
@@ -232,19 +406,53 @@ export default function SerialPortInterface() {
   const handlePinStateChange = (newPinStates: { [key: number]: boolean }) => {
     if (!isConnected || !selectedIC) return;
 
-    // Create a command string with the pin states
-    const pinStateStr = Object.entries(newPinStates)
-      .filter(([pin, _]) => {
-        const pinConfig = selectedIC.pinConfiguration.find(
-          (p) => p.pin === parseInt(pin)
-        );
-        return pinConfig && pinConfig.type === "INPUT";
-      })
-      .map(([pin, state]) => `${pin}:${state ? "1" : "0"}`)
-      .join(",");
+    // Create a binary string representing all pin states
+    let pinStateStr = "";
+    const pinCount = selectedIC.pinCount || 14; // Default to 14 if not specified
+    
+    // Validate pin count
+    if (pinCount < 14 || pinCount > 16) {
+      setDebugLogs(prev => [...prev, {
+        timestamp: new Date().toISOString(),
+        type: "error",
+        message: `Invalid pin count: ${pinCount}. Must be between 14 and 16.`
+      }]);
+      return;
+    }
+    
+    // Build the binary string based on current pin states and new changes
+    for (let i = 1; i <= pinCount; i++) {
+      // If the pin state is being changed, use the new state
+      // Otherwise, use the current state from pinStates
+      const state = i in newPinStates ? newPinStates[i] : (pinStates[i] || false);
+      pinStateStr += state ? "1" : "0";
+    }
+
+    // Validate binary string length
+    if (pinStateStr.length < 14 || pinStateStr.length > 16) {
+      setDebugLogs(prev => [...prev, {
+        timestamp: new Date().toISOString(),
+        type: "error",
+        message: `Invalid pin state string length: ${pinStateStr.length}. Must be between 14 and 16 bits.`
+      }]);
+      return;
+    }
 
     // Send the pin states to the device
     sendData(`PINS:${pinStateStr}\n`);
+
+    // Update local pin states
+    setPinStates(prev => ({
+      ...prev,
+      ...newPinStates
+    }));
+
+    // Log the change with detailed information
+    setDebugLogs(prev => [...prev, {
+      timestamp: new Date().toISOString(),
+      type: "sent",
+      message: `Pin states changed for ${selectedIC.partNumber}: ${pinStateStr} (${pinCount} pins)`
+    }]);
   };
 
   // Monitor port connection changes
@@ -309,7 +517,9 @@ export default function SerialPortInterface() {
           <select
             className="w-full p-2 border rounded dark:bg-gray-700 dark:text-white dark:border-gray-600"
             value={
-              selectedPort ? ports.findIndex((p) => p.port === selectedPort) : ""
+              selectedPort
+                ? ports.findIndex((p) => p.port === selectedPort)
+                : ""
             }
             onChange={(e) => {
               const index = parseInt(e.target.value);
@@ -350,7 +560,9 @@ export default function SerialPortInterface() {
 
         {/* Error Messages */}
         {error && (
-          <div className="mt-4 p-2 bg-red-100 text-red-700 rounded">{error}</div>
+          <div className="mt-4 p-2 bg-red-100 text-red-700 rounded">
+            {error}
+          </div>
         )}
       </div>
 
@@ -361,12 +573,91 @@ export default function SerialPortInterface() {
         </h2>
         <ICSelector onICSelect={handleICSelect} />
         {selectedIC && (
-          <div className="mt-6">
-            <ICVisualizer
-              ic={selectedIC}
+          <>
+            <div className="mt-6">
+              <ICVisualizer
+                ic={selectedIC}
+                onPinStateChange={handlePinStateChange}
+                serialConnected={isConnected}
+              />
+            </div>
+            <ICTruthTableVerifier
+              selectedIC={selectedIC.partNumber}
+              currentPinStates={pinStates}
               onPinStateChange={handlePinStateChange}
-              serialConnected={isConnected}
+              onClockFrequencyChange={handleClockFrequencyChange}
+              isConnected={isConnected}
             />
+          </>
+        )}
+      </div>
+
+      {/* Debug Log */}
+      <div className="p-6 bg-white dark:bg-gray-800 rounded-xl shadow-md">
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-xl font-bold dark:text-white">
+            Debug Log
+          </h2>
+          <div className="flex space-x-2">
+            <button
+              onClick={() => setDebugLogs([])}
+              className="px-3 py-1 text-sm bg-red-100 text-red-800 rounded hover:bg-red-200 dark:bg-red-900 dark:text-red-100 dark:hover:bg-red-800"
+            >
+              Clear Log
+            </button>
+            <button
+              onClick={() => {
+                if (isConnected) {
+                  sendData("SYNC\n");
+                }
+              }}
+              disabled={!isConnected}
+              className="px-3 py-1 text-sm bg-blue-100 text-blue-800 rounded hover:bg-blue-200 dark:bg-blue-900 dark:text-blue-100 dark:hover:bg-blue-800 disabled:opacity-50"
+            >
+              Request Sync
+            </button>
+          </div>
+        </div>
+        
+        <div className="h-96 overflow-y-auto border rounded dark:border-gray-700 bg-gray-50 dark:bg-gray-900">
+          <div className="sticky top-0 bg-gray-100 dark:bg-gray-800 border-b dark:border-gray-700">
+            <div className="grid grid-cols-12 gap-2 px-4 py-2 text-xs font-medium text-gray-500 dark:text-gray-400">
+              <div className="col-span-2">Time</div>
+              <div className="col-span-2">Type</div>
+              <div className="col-span-8">Message</div>
+            </div>
+          </div>
+          
+          <div className="divide-y divide-gray-200 dark:divide-gray-700">
+            {debugLogs.slice().reverse().map((log, index) => (
+              <div
+                key={index}
+                className="grid grid-cols-12 gap-2 px-4 py-2 text-sm hover:bg-white dark:hover:bg-gray-800"
+              >
+                <div className="col-span-2 text-gray-500 dark:text-gray-400">
+                  {new Date(log.timestamp).toLocaleTimeString()}
+                </div>
+                <div className="col-span-2">
+                  <span className={`inline-block px-2 py-0.5 text-xs rounded-full ${
+                    log.type === "received" ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100" :
+                    log.type === "sent" ? "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-100" :
+                    log.type === "info" ? "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-100" :
+                    "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-100"
+                  }`}>
+                    {log.type}
+                  </span>
+                </div>
+                <div className="col-span-8 font-mono text-gray-900 dark:text-gray-100 break-all">
+                  {log.message}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+        
+        {debugLogs.length === 0 && (
+          <div className="text-center p-4 text-gray-500 dark:text-gray-400">
+            No debug messages yet
           </div>
         )}
       </div>
