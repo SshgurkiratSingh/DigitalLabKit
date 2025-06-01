@@ -49,33 +49,54 @@ export default function ICSelector({
       const ics: ICData[] = [];
       const errors: string[] = [];
 
-      for (const file of files) {
-        try {
-          const response = await fetch(`/files/${file}.json`);
+      try {
+        // Load all IC files in parallel
+        const responses = await Promise.all(
+          files.map(file => fetch(`/files/${file}.json`))
+        );
+
+        // Process each response
+        for (let i = 0; i < responses.length; i++) {
+          const response = responses[i];
+          const file = files[i];
+
           if (!response.ok) {
             errors.push(`Failed to load ${file}.json: ${response.statusText}`);
             continue;
           }
-          const data: ICFile = await response.json();
-          
-          // Flatten the nested structure and extract all ICs
-          const extractICs = (obj: any) => {
-            if (obj && typeof obj === 'object') {
-              if ('partNumber' in obj) {
-                // Only add ICs with valid pin counts (14-16)
-                if (obj.pinCount >= 14 && obj.pinCount <= 16) {
-                  ics.push(obj);
+
+          try {
+            const data: ICFile = await response.json();
+            
+            // Flatten the nested structure and extract all ICs
+            const extractICs = (obj: any) => {
+              if (obj && typeof obj === 'object') {
+                if ('partNumber' in obj) {
+                  // Only add ICs with valid pin counts (14-16)
+                  if (obj.pinCount >= 14 && obj.pinCount <= 16) {
+                    // Add category information to the IC object but don't show it in UI
+                    const icWithCategory = {
+                      ...obj,
+                      category: file.replace(/IC$|Ic$/, '')
+                    };
+                    // Check if this IC is not already in the list (avoid duplicates)
+                    if (!ics.some(existingIC => existingIC.partNumber === obj.partNumber)) {
+                      ics.push(icWithCategory);
+                    }
+                  }
+                } else {
+                  Object.values(obj).forEach(value => extractICs(value));
                 }
-              } else {
-                Object.values(obj).forEach(value => extractICs(value));
               }
-            }
-          };
-          
-          extractICs(data);
-        } catch (error) {
-          errors.push(`Error loading ${file}.json: ${error}`);
+            };
+            
+            extractICs(data);
+          } catch (error) {
+            errors.push(`Error parsing ${file}.json: ${error}`);
+          }
         }
+      } catch (error) {
+        errors.push(`Error loading IC files: ${error}`);
       }
 
       if (errors.length > 0) {
@@ -129,7 +150,7 @@ export default function ICSelector({
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
             Available ICs ({filteredICs.length})
           </label>
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
             {filteredICs.map((ic) => (
               <button
                 key={ic.partNumber}
@@ -137,18 +158,23 @@ export default function ICSelector({
                   setSelectedIC(ic.partNumber);
                   onICSelect(ic);
                 }}
-                className={`p-2 text-sm text-left border rounded transition-colors
+                className={`p-2 text-sm text-left border rounded transition-colors flex flex-col
                   ${selectedIC === ic.partNumber
                     ? 'bg-blue-100 border-blue-500 dark:bg-blue-900 dark:border-blue-400'
                     : 'hover:bg-gray-100 dark:hover:bg-gray-800 border-gray-200 dark:border-gray-700'}
                   dark:text-white`}
               >
-                <div className="font-medium">{ic.partNumber}</div>
-                <div className="text-xs text-gray-600 dark:text-gray-400 truncate">
+                <div className="flex justify-between items-start">
+                  <div className="font-medium text-base">{ic.partNumber}</div>
+                  <div className="text-xs px-2 py-0.5 rounded bg-gray-200 dark:bg-gray-700">
+                    {ic.pinCount} pins
+                  </div>
+                </div>
+                <div className="text-xs text-gray-600 dark:text-gray-400 mt-1 line-clamp-2">
                   {ic.description}
                 </div>
                 <div className="text-xs text-gray-500 dark:text-gray-500 mt-1">
-                  {ic.pinCount} pins
+                  {ic.category}
                 </div>
               </button>
             ))}

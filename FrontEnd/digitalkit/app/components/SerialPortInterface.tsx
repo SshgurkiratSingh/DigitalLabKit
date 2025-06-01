@@ -64,18 +64,26 @@ interface ICData {
   }>;
 }
 
-export default function SerialPortInterface() {
+interface SerialPortInterfaceProps {
+  onICSelect?: (ic: ICData | null) => void;
+}
+
+export default function SerialPortInterface({
+  onICSelect,
+}: SerialPortInterfaceProps = {}) {
   const [ports, setPorts] = useState<SerialPortInfoWrapper[]>([]);
   const [selectedPort, setSelectedPort] = useState<SerialPort | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedIC, setSelectedIC] = useState<ICData | null>(null);
   const [pinStates, setPinStates] = useState<{ [key: number]: boolean }>({});
-  const [debugLogs, setDebugLogs] = useState<Array<{
-    timestamp: string;
-    type: "received" | "sent" | "info" | "error";
-    message: string;
-  }>>([]);
+  const [debugLogs, setDebugLogs] = useState<
+    Array<{
+      timestamp: string;
+      type: "received" | "sent" | "info" | "error";
+      message: string;
+    }>
+  >([]);
   const [allICs, setAllICs] = useState<ICData[]>([]);
   const [syncInterval, setSyncInterval] = useState<NodeJS.Timeout | null>(null);
   const writerRef = useRef<WritableStreamDefaultWriter<Uint8Array> | null>(
@@ -84,6 +92,11 @@ export default function SerialPortInterface() {
   const readerRef = useRef<ReadableStreamDefaultReader<Uint8Array> | null>(
     null
   );
+
+  // Use refs for command buffer to avoid state timing issues
+  const commandBufferRef = useRef<string>("");
+  const lastCommandTimeRef = useRef<number>(0);
+  const COMMAND_TIMEOUT = 500; // Increased to 500ms for more reliable command assembly
 
   // Check if Web Serial API is supported
   const isSerialSupported = "serial" in navigator;
@@ -159,20 +172,30 @@ export default function SerialPortInterface() {
       setIsConnected(true);
       setError(null);
 
+      // Reset command buffer on new connection
+      commandBufferRef.current = "";
+      lastCommandTimeRef.current = 0;
+
       // Add connection log
-      setDebugLogs(prev => [...prev, {
-        timestamp: new Date().toISOString(),
-        type: "info",
-        message: "Connected to serial port"
-      }]);
+      setDebugLogs((prev) => [
+        ...prev,
+        {
+          timestamp: new Date().toISOString(),
+          type: "info",
+          message: "Connected to serial port",
+        },
+      ]);
     } catch (err) {
       setError("Failed to connect to port");
       console.error(err);
-      setDebugLogs(prev => [...prev, {
-        timestamp: new Date().toISOString(),
-        type: "error",
-        message: `Connection failed: ${err}`
-      }]);
+      setDebugLogs((prev) => [
+        ...prev,
+        {
+          timestamp: new Date().toISOString(),
+          type: "error",
+          message: `Connection failed: ${err}`,
+        },
+      ]);
     }
   };
 
@@ -203,36 +226,129 @@ export default function SerialPortInterface() {
       setIsConnected(false);
       setError(null);
 
+      // Reset command buffer
+      commandBufferRef.current = "";
+      lastCommandTimeRef.current = 0;
+
       // Add disconnection log
-      setDebugLogs(prev => [...prev, {
-        timestamp: new Date().toISOString(),
-        type: "info",
-        message: "Disconnected from serial port"
-      }]);
+      setDebugLogs((prev) => [
+        ...prev,
+        {
+          timestamp: new Date().toISOString(),
+          type: "info",
+          message: "Disconnected from serial port",
+        },
+      ]);
     } catch (err) {
       setError("Failed to disconnect from port");
       console.error(err);
-      setDebugLogs(prev => [...prev, {
-        timestamp: new Date().toISOString(),
-        type: "error",
-        message: `Disconnection failed: ${err}`
-      }]);
+      setDebugLogs((prev) => [
+        ...prev,
+        {
+          timestamp: new Date().toISOString(),
+          type: "error",
+          message: `Disconnection failed: ${err}`,
+        },
+      ]);
     }
   };
 
-  // Start reading from the serial port
+  // Start reading from the serial port with auto-reconnect
   const startReading = async () => {
+    const maxRetries = 3;
+    let retryCount = 0;
+
     while (true) {
       try {
-        if (!readerRef.current) break;
+        if (!readerRef.current) {
+          throw new Error("No reader available");
+        }
 
         const { value, done } = await readerRef.current.read();
-        if (done) break;
+        if (done) {
+          throw new Error("Reader stream closed");
+        }
+
+        // Reset retry count on successful read
+        retryCount = 0;
 
         // Process the received data
         handleReceivedData(value);
       } catch (error) {
         console.error("Error reading from serial port:", error);
+        setDebugLogs((prev) => [
+          ...prev,
+          {
+            timestamp: new Date().toISOString(),
+            type: "error",
+            message: `Serial read error: ${error}`,
+          },
+        ]);
+
+        // Attempt to reconnect
+        if (retryCount < maxRetries) {
+          retryCount++;
+          setDebugLogs((prev) => [
+            ...prev,
+            {
+              timestamp: new Date().toISOString(),
+              type: "info",
+              message: `Attempting to reconnect (${retryCount}/${maxRetries})...`,
+            },
+          ]);
+
+          try {
+            // Close existing connections
+            if (readerRef.current) {
+              await readerRef.current.cancel();
+              await readerRef.current.releaseLock();
+            }
+            if (writerRef.current) {
+              await writerRef.current.close();
+              await writerRef.current.releaseLock();
+            }
+            if (selectedPort) {
+              await selectedPort.close();
+            }
+
+            // Wait before reconnecting
+            await new Promise((resolve) => setTimeout(resolve, 1000));
+
+            // Attempt to reconnect
+            if (selectedPort) {
+              await selectedPort.open({ baudRate: 115200 });
+              if (selectedPort.readable) {
+                readerRef.current = selectedPort.readable.getReader();
+              }
+              if (selectedPort.writable) {
+                writerRef.current = selectedPort.writable.getWriter();
+              }
+              setDebugLogs((prev) => [
+                ...prev,
+                {
+                  timestamp: new Date().toISOString(),
+                  type: "info",
+                  message: "Reconnected successfully",
+                },
+              ]);
+              continue;
+            }
+          } catch (reconnectError) {
+            console.error("Reconnection failed:", reconnectError);
+            setDebugLogs((prev) => [
+              ...prev,
+              {
+                timestamp: new Date().toISOString(),
+                type: "error",
+                message: `Reconnection failed: ${reconnectError}`,
+              },
+            ]);
+          }
+        }
+
+        // If all retries failed, disconnect
+        setIsConnected(false);
+        setError("Connection lost. Please reconnect manually.");
         break;
       }
     }
@@ -242,122 +358,256 @@ export default function SerialPortInterface() {
   const handleReceivedData = (data: Uint8Array) => {
     // Convert the received data to a string
     const text = new TextDecoder().decode(data);
-    const lines = text.split('\n').filter(line => line.trim());
-    
-    for (const line of lines) {
-      // Add to debug log
-      const logEntry = {
-        timestamp: new Date().toISOString(),
-        type: "received" as const,
-        message: line.trim()
-      };
-      setDebugLogs(prev => [...prev, logEntry]);
+    const currentTime = Date.now();
 
-      try {
-        // Parse IC selection from the received data
-        if (line.startsWith("IC:")) {
-          const icNumber = line.substring(3).trim();
-          // Extract initial numeric part from received IC number
-          const numericPart = icNumber.match(/^\d+/)?.[0];
-          if (numericPart) {
-            // Find IC by matching the initial numeric part
-            const matchingIC = allICs.find(ic => ic.partNumber.startsWith(numericPart));
-            if (matchingIC) {
-              // Use a single setState call with a callback to avoid state updates during render
-              setDebugLogs(prev => [...prev, {
-                timestamp: new Date().toISOString(),
-                type: "info",
-                message: `Selected IC ${matchingIC.partNumber} based on received number ${numericPart}`
-              }]);
-              
-              // Update IC selection
-              setSelectedIC(matchingIC);
-              onICSelect(matchingIC);
-              
-              // Request initial pin states
-              sendData("PINS?\n");
-            } else {
-              setDebugLogs(prev => [...prev, {
-                timestamp: new Date().toISOString(),
-                type: "error",
-                message: `No IC found matching number: ${numericPart}`
-              }]);
-            }
-          } else {
-            setDebugLogs(prev => [...prev, {
-              timestamp: new Date().toISOString(),
-              type: "error",
-              message: `Invalid IC number format: ${icNumber}`
-            }]);
-          }
-          continue;
-        }
-
-        // Parse the pin states from the received data
-        if (line.startsWith("PINS:")) {
-          const pinData = line.substring(5).trim();
-          
-          // Validate pin data length (14-16 bits) and format
-          if (pinData.length >= 14 && pinData.length <= 16 && /^[01]+$/.test(pinData)) {
-            const newPinStates: { [key: number]: boolean } = {};
-            
-            // Parse each bit into pin states
-            for (let i = 0; i < pinData.length; i++) {
-              newPinStates[i + 1] = pinData[i] === "1";
-            }
-
-            // Update pin states in a single setState call
-            setPinStates(newPinStates);
-            
-            // Log pin state update
-            setDebugLogs(prev => [...prev, {
-              timestamp: new Date().toISOString(),
-              type: "info",
-              message: `Pin states updated: ${pinData}`
-            }]);
-          } else {
-            setDebugLogs(prev => [...prev, {
-              timestamp: new Date().toISOString(),
-              type: "error",
-              message: `Invalid pin data format: ${pinData}`
-            }]);
-          }
-          continue;
-        }
-
-        // Handle sync response
-        if (line === "SYNC:OK") {
-          setDebugLogs(prev => [...prev, {
-            timestamp: new Date().toISOString(),
-            type: "info",
-            message: "Device synchronized"
-          }]);
-          continue;
-        }
-
-        // Handle error messages
-        if (line.startsWith("ERROR:")) {
-          setDebugLogs(prev => [...prev, {
-            timestamp: new Date().toISOString(),
-            type: "error",
-            message: line.substring(6).trim()
-          }]);
-          continue;
-        }
-
-        // Log any unhandled messages
-        setDebugLogs(prev => [...prev, {
+    // Check if it's been too long since the last command - if so, clear buffer
+    if (
+      currentTime - lastCommandTimeRef.current > COMMAND_TIMEOUT &&
+      commandBufferRef.current.length > 0
+    ) {
+      setDebugLogs((prev) => [
+        ...prev,
+        {
           timestamp: new Date().toISOString(),
           type: "info",
-          message: `Unhandled message: ${line}`
-        }]);
-      } catch (error) {
-        setDebugLogs(prev => [...prev, {
+          message: `Command buffer timeout, clearing: "${commandBufferRef.current}"`,
+        },
+      ]);
+      commandBufferRef.current = "";
+    }
+
+    // Add new data to command buffer
+    commandBufferRef.current += text;
+    lastCommandTimeRef.current = currentTime;
+
+    // Debug log for raw data
+    setDebugLogs((prev) => [
+      ...prev,
+      {
+        timestamp: new Date().toISOString(),
+        type: "info",
+        message: `Raw data received: "${text}" (buffer now: "${commandBufferRef.current}")`,
+      },
+    ]);
+
+    // Process complete commands from the buffer
+    processCommandBuffer();
+  };
+
+  // Process complete commands from the buffer
+  const processCommandBuffer = () => {
+    const buffer = commandBufferRef.current;
+    const lines = buffer.split("\n");
+
+    // If we have at least one complete line (ends with newline)
+    if (lines.length > 1) {
+      const completeLines = lines.slice(0, -1); // All but the last (incomplete) line
+      const remainingBuffer = lines[lines.length - 1]; // The incomplete line
+
+      // Only process the LAST complete line (final command)
+      if (completeLines.length > 0) {
+        const finalCommand = completeLines[completeLines.length - 1].trim();
+        if (finalCommand) {
+          processCommand(finalCommand);
+        }
+
+        // Log any skipped commands for debugging
+        if (completeLines.length > 1) {
+          const skippedCommands = completeLines.slice(0, -1);
+          setDebugLogs((prev) => [
+            ...prev,
+            {
+              timestamp: new Date().toISOString(),
+              type: "info",
+              message: `Skipped ${
+                skippedCommands.length
+              } intermediate commands: [${skippedCommands.join(", ")}]`,
+            },
+          ]);
+        }
+      }
+
+      // Update buffer with remaining incomplete data
+      commandBufferRef.current = remainingBuffer;
+
+      // Update last command time since we processed data
+      lastCommandTimeRef.current = Date.now();
+    }
+  };
+  // Process a complete command
+  const processCommand = (command: string) => {
+    console.log("Processing command:", command);
+    // Add to debug log
+    const logEntry = {
+      timestamp: new Date().toISOString(),
+      type: "received" as const,
+      message: command,
+    };
+    setDebugLogs((prev) => [...prev, logEntry]);
+
+    try {
+      // Parse IC selection from the received data
+      if (command.startsWith("IC:")) {
+        console.log("Processing IC command:", command);
+        const icNumber = command.substring(3).trim();
+        // Extract initial numeric part from received IC number
+        const numericPart = icNumber.match(/^\d+/)?.[0];
+        if (numericPart) {
+          // Find IC by matching the initial numeric part
+          const matchingIC = allICs.find((ic) =>
+            ic.partNumber.startsWith(numericPart)
+          );
+          if (matchingIC) {
+            setDebugLogs((prev) => [
+              ...prev,
+              {
+                timestamp: new Date().toISOString(),
+                type: "info",
+                message: `Selected IC ${matchingIC.partNumber} based on received number ${numericPart}`,
+              },
+            ]);
+
+            // Update IC selection
+            setSelectedIC(matchingIC);
+            onICSelect?.(matchingIC);
+
+            // Request initial pin states
+            sendData("PINS?\n");
+          } else {
+            setDebugLogs((prev) => [
+              ...prev,
+              {
+                timestamp: new Date().toISOString(),
+                type: "error",
+                message: `No IC found matching number: ${numericPart}`,
+              },
+            ]);
+          }
+        } else {
+          setDebugLogs((prev) => [
+            ...prev,
+            {
+              timestamp: new Date().toISOString(),
+              type: "error",
+              message: `Invalid IC number format: ${icNumber}`,
+            },
+          ]);
+        }
+        return;
+      }
+
+      // Parse binary pin states from the received data
+      if (/^[01]{14,16}$/.test(command)) {
+        const pinData = command;
+        const newPinStates: { [key: number]: boolean } = {};
+
+        // Parse each bit into pin states
+        for (let i = 0; i < pinData.length; i++) {
+          newPinStates[i + 1] = pinData[i] === "1";
+        }
+
+        // Update pin states in a single setState call
+        setPinStates(newPinStates);
+
+        // Log pin state update
+        setDebugLogs((prev) => [
+          ...prev,
+          {
+            timestamp: new Date().toISOString(),
+            type: "info",
+            message: `Pin states updated from binary data: ${pinData}`,
+          },
+        ]);
+        return;
+      }
+
+      // Parse the pin states from the PINS: command format (backward compatibility)
+      if (command.startsWith("PINS:")) {
+        console.log("Processing PINS command:", command);
+        const pinData = command.substring(5).trim();
+
+        // Validate pin data length (14-16 bits) and format
+        if (
+          pinData.length >= 14 &&
+          pinData.length <= 16 &&
+          /^[01]+$/.test(pinData)
+        ) {
+          const newPinStates: { [key: number]: boolean } = {};
+
+          // Parse each bit into pin states
+          for (let i = 0; i < pinData.length; i++) {
+            newPinStates[i + 1] = pinData[i] === "1";
+          }
+
+          // Update pin states in a single setState call
+          setPinStates(newPinStates);
+
+          // Log pin state update
+          setDebugLogs((prev) => [
+            ...prev,
+            {
+              timestamp: new Date().toISOString(),
+              type: "info",
+              message: `Pin states updated from PINS command: ${pinData}`,
+            },
+          ]);
+        } else {
+          setDebugLogs((prev) => [
+            ...prev,
+            {
+              timestamp: new Date().toISOString(),
+              type: "error",
+              message: `Invalid pin data format: ${pinData}`,
+            },
+          ]);
+        }
+        return;
+      }
+
+      // Handle sync response
+      if (command === "SYNC:OK") {
+        setDebugLogs((prev) => [
+          ...prev,
+          {
+            timestamp: new Date().toISOString(),
+            type: "info",
+            message: "Device synchronized",
+          },
+        ]);
+        return;
+      }
+
+      // Handle error messages
+      if (command.startsWith("ERROR:")) {
+        setDebugLogs((prev) => [
+          ...prev,
+          {
+            timestamp: new Date().toISOString(),
+            type: "error",
+            message: command.substring(6).trim(),
+          },
+        ]);
+        return;
+      }
+
+      // Log any unhandled messages
+      setDebugLogs((prev) => [
+        ...prev,
+        {
+          timestamp: new Date().toISOString(),
+          type: "info",
+          message: `Unhandled message: ${command}`,
+        },
+      ]);
+    } catch (error) {
+      setDebugLogs((prev) => [
+        ...prev,
+        {
           timestamp: new Date().toISOString(),
           type: "error",
-          message: `Error processing message: ${error}`
-        }]);
-      }
+          message: `Error processing message: ${error}`,
+        },
+      ]);
     }
   };
 
@@ -370,18 +620,24 @@ export default function SerialPortInterface() {
       await writerRef.current.write(encoder.encode(data));
 
       // Add to debug log
-      setDebugLogs(prev => [...prev, {
-        timestamp: new Date().toISOString(),
-        type: "sent",
-        message: data.trim()
-      }]);
+      setDebugLogs((prev) => [
+        ...prev,
+        {
+          timestamp: new Date().toISOString(),
+          type: "sent",
+          message: data.trim(),
+        },
+      ]);
     } catch (error) {
       console.error("Error writing to serial port:", error);
-      setDebugLogs(prev => [...prev, {
-        timestamp: new Date().toISOString(),
-        type: "error",
-        message: `Failed to send data: ${error}`
-      }]);
+      setDebugLogs((prev) => [
+        ...prev,
+        {
+          timestamp: new Date().toISOString(),
+          type: "error",
+          message: `Failed to send data: ${error}`,
+        },
+      ]);
     }
   };
 
@@ -409,50 +665,59 @@ export default function SerialPortInterface() {
     // Create a binary string representing all pin states
     let pinStateStr = "";
     const pinCount = selectedIC.pinCount || 14; // Default to 14 if not specified
-    
+
     // Validate pin count
     if (pinCount < 14 || pinCount > 16) {
-      setDebugLogs(prev => [...prev, {
-        timestamp: new Date().toISOString(),
-        type: "error",
-        message: `Invalid pin count: ${pinCount}. Must be between 14 and 16.`
-      }]);
+      setDebugLogs((prev) => [
+        ...prev,
+        {
+          timestamp: new Date().toISOString(),
+          type: "error",
+          message: `Invalid pin count: ${pinCount}. Must be between 14 and 16.`,
+        },
+      ]);
       return;
     }
-    
+
     // Build the binary string based on current pin states and new changes
     for (let i = 1; i <= pinCount; i++) {
       // If the pin state is being changed, use the new state
       // Otherwise, use the current state from pinStates
-      const state = i in newPinStates ? newPinStates[i] : (pinStates[i] || false);
+      const state = i in newPinStates ? newPinStates[i] : pinStates[i] || false;
       pinStateStr += state ? "1" : "0";
     }
 
     // Validate binary string length
     if (pinStateStr.length < 14 || pinStateStr.length > 16) {
-      setDebugLogs(prev => [...prev, {
-        timestamp: new Date().toISOString(),
-        type: "error",
-        message: `Invalid pin state string length: ${pinStateStr.length}. Must be between 14 and 16 bits.`
-      }]);
+      setDebugLogs((prev) => [
+        ...prev,
+        {
+          timestamp: new Date().toISOString(),
+          type: "error",
+          message: `Invalid pin state string length: ${pinStateStr.length}. Must be between 14 and 16 bits.`,
+        },
+      ]);
       return;
     }
 
-    // Send the pin states to the device
-    sendData(`PINS:${pinStateStr}\n`);
+    // Send the binary pin states directly to the device
+    sendData(`${pinStateStr}\n`);
 
     // Update local pin states
-    setPinStates(prev => ({
+    setPinStates((prev) => ({
       ...prev,
-      ...newPinStates
+      ...newPinStates,
     }));
 
     // Log the change with detailed information
-    setDebugLogs(prev => [...prev, {
-      timestamp: new Date().toISOString(),
-      type: "sent",
-      message: `Pin states changed for ${selectedIC.partNumber}: ${pinStateStr} (${pinCount} pins)`
-    }]);
+    setDebugLogs((prev) => [
+      ...prev,
+      {
+        timestamp: new Date().toISOString(),
+        type: "sent",
+        message: `Pin states changed for ${selectedIC.partNumber}: ${pinStateStr} (${pinCount} pins)`,
+      },
+    ]);
   };
 
   // Monitor port connection changes
@@ -595,9 +860,7 @@ export default function SerialPortInterface() {
       {/* Debug Log */}
       <div className="p-6 bg-white dark:bg-gray-800 rounded-xl shadow-md">
         <div className="flex justify-between items-center mb-4">
-          <h2 className="text-xl font-bold dark:text-white">
-            Debug Log
-          </h2>
+          <h2 className="text-xl font-bold dark:text-white">Debug Log</h2>
           <div className="flex space-x-2">
             <button
               onClick={() => setDebugLogs([])}
@@ -616,9 +879,24 @@ export default function SerialPortInterface() {
             >
               Request Sync
             </button>
+            <button
+              onClick={() => {
+                setDebugLogs((prev) => [
+                  ...prev,
+                  {
+                    timestamp: new Date().toISOString(),
+                    type: "info",
+                    message: `Current buffer content: "${commandBufferRef.current}"`,
+                  },
+                ]);
+              }}
+              className="px-3 py-1 text-sm bg-yellow-100 text-yellow-800 rounded hover:bg-yellow-200 dark:bg-yellow-900 dark:text-yellow-100 dark:hover:bg-yellow-800"
+            >
+              Show Buffer
+            </button>
           </div>
         </div>
-        
+
         <div className="h-96 overflow-y-auto border rounded dark:border-gray-700 bg-gray-50 dark:bg-gray-900">
           <div className="sticky top-0 bg-gray-100 dark:bg-gray-800 border-b dark:border-gray-700">
             <div className="grid grid-cols-12 gap-2 px-4 py-2 text-xs font-medium text-gray-500 dark:text-gray-400">
@@ -627,34 +905,42 @@ export default function SerialPortInterface() {
               <div className="col-span-8">Message</div>
             </div>
           </div>
-          
+
           <div className="divide-y divide-gray-200 dark:divide-gray-700">
-            {debugLogs.slice().reverse().map((log, index) => (
-              <div
-                key={index}
-                className="grid grid-cols-12 gap-2 px-4 py-2 text-sm hover:bg-white dark:hover:bg-gray-800"
-              >
-                <div className="col-span-2 text-gray-500 dark:text-gray-400">
-                  {new Date(log.timestamp).toLocaleTimeString()}
+            {debugLogs
+              .slice()
+              .reverse()
+              .map((log, index) => (
+                <div
+                  key={index}
+                  className="grid grid-cols-12 gap-2 px-4 py-2 text-sm hover:bg-white dark:hover:bg-gray-800"
+                >
+                  <div className="col-span-2 text-gray-500 dark:text-gray-400">
+                    {new Date(log.timestamp).toLocaleTimeString()}
+                  </div>
+                  <div className="col-span-2">
+                    <span
+                      className={`inline-block px-2 py-0.5 text-xs rounded-full ${
+                        log.type === "received"
+                          ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100"
+                          : log.type === "sent"
+                          ? "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-100"
+                          : log.type === "info"
+                          ? "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-100"
+                          : "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-100"
+                      }`}
+                    >
+                      {log.type}
+                    </span>
+                  </div>
+                  <div className="col-span-8 font-mono text-gray-900 dark:text-gray-100 break-all">
+                    {log.message}
+                  </div>
                 </div>
-                <div className="col-span-2">
-                  <span className={`inline-block px-2 py-0.5 text-xs rounded-full ${
-                    log.type === "received" ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100" :
-                    log.type === "sent" ? "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-100" :
-                    log.type === "info" ? "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-100" :
-                    "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-100"
-                  }`}>
-                    {log.type}
-                  </span>
-                </div>
-                <div className="col-span-8 font-mono text-gray-900 dark:text-gray-100 break-all">
-                  {log.message}
-                </div>
-              </div>
-            ))}
+              ))}
           </div>
         </div>
-        
+
         {debugLogs.length === 0 && (
           <div className="text-center p-4 text-gray-500 dark:text-gray-400">
             No debug messages yet
