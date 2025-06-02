@@ -436,14 +436,32 @@ export default function SerialPortInterface({
         const icNumber = command.substring(3).trim();
         // Extract numeric part and series prefix from received IC number
         const numericPart = icNumber.match(/\d+/)?.[0];
-        const seriesPrefix = icNumber.match(/^[a-zA-Z]+/)?.[0]?.toLowerCase() || '';
-        
+        const seriesPrefix =
+          icNumber.match(/^[a-zA-Z]+/)?.[0]?.toLowerCase() || "";
+        console.log(
+          "Processing IC command:",
+          icNumber,
+          numericPart,
+          seriesPrefix
+        );
         if (numericPart) {
           // First try exact match (case insensitive)
-          const exactMatch = allICs.find((ic) => 
-            ic.partNumber.toLowerCase() === icNumber.toLowerCase()
+          const exactMatch = allICs.find(
+            (ic) => ic.partNumber.toLowerCase() === icNumber.toLowerCase()
           );
-          
+
+          // Log all available ICs for debugging
+          setDebugLogs((prev) => [
+            ...prev,
+            {
+              timestamp: new Date().toISOString(),
+              type: "info",
+              message: `Searching for IC: ${icNumber}. Available ICs: ${allICs
+                .map((ic) => ic.partNumber)
+                .join(", ")}`,
+            },
+          ]);
+
           if (exactMatch) {
             setDebugLogs((prev) => [
               ...prev,
@@ -462,35 +480,43 @@ export default function SerialPortInterface({
           // Try numeric part match with series consideration
           const numericMatches = allICs.filter((ic) => {
             const icDigits = ic.partNumber.match(/\d+/)?.[0];
-            const icPrefix = ic.partNumber.match(/^[a-zA-Z]+/)?.[0]?.toLowerCase() || '';
-            
+            const icPrefix =
+              ic.partNumber.match(/^[a-zA-Z]+/)?.[0]?.toLowerCase() || "";
+
             // If a series prefix was provided, it must match
             if (seriesPrefix && icPrefix && seriesPrefix !== icPrefix) {
               return false;
             }
-            
+
             // Allow for partial numeric matches (e.g., "74" matches "7400")
-            return icDigits?.startsWith(numericPart) || numericPart.startsWith(icDigits || '');
+            return (
+              icDigits?.startsWith(numericPart) ||
+              numericPart.startsWith(icDigits || "")
+            );
           });
 
           if (numericMatches.length >= 1) {
             // Sort matches by closest numeric match
             numericMatches.sort((a, b) => {
-              const aDigits = a.partNumber.match(/\d+/)?.[0] || '';
-              const bDigits = b.partNumber.match(/\d+/)?.[0] || '';
-              
+              const aDigits = a.partNumber.match(/\d+/)?.[0] || "";
+              const bDigits = b.partNumber.match(/\d+/)?.[0] || "";
+
               // Prioritize exact numeric matches
               if (aDigits === numericPart && bDigits !== numericPart) return -1;
               if (bDigits === numericPart && aDigits !== numericPart) return 1;
-              
+
               // Then prioritize prefix matches
-              const aPrefix = a.partNumber.match(/^[a-zA-Z]+/)?.[0]?.toLowerCase() || '';
-              const bPrefix = b.partNumber.match(/^[a-zA-Z]+/)?.[0]?.toLowerCase() || '';
+              const aPrefix =
+                a.partNumber.match(/^[a-zA-Z]+/)?.[0]?.toLowerCase() || "";
+              const bPrefix =
+                b.partNumber.match(/^[a-zA-Z]+/)?.[0]?.toLowerCase() || "";
               if (seriesPrefix) {
-                if (aPrefix === seriesPrefix && bPrefix !== seriesPrefix) return -1;
-                if (bPrefix === seriesPrefix && aPrefix !== seriesPrefix) return 1;
+                if (aPrefix === seriesPrefix && bPrefix !== seriesPrefix)
+                  return -1;
+                if (bPrefix === seriesPrefix && aPrefix !== seriesPrefix)
+                  return 1;
               }
-              
+
               // Finally sort by numeric similarity
               const aDiff = Math.abs(parseInt(aDigits) - parseInt(numericPart));
               const bDiff = Math.abs(parseInt(bDigits) - parseInt(numericPart));
@@ -498,20 +524,28 @@ export default function SerialPortInterface({
             });
 
             const matchingIC = numericMatches[0];
-            const matchType = matchingIC.partNumber.match(/\d+/)?.[0] === numericPart ? 'exact' : 'partial';
-            const seriesMatch = matchingIC.partNumber.toLowerCase().startsWith(seriesPrefix);
-            
+            const matchType =
+              matchingIC.partNumber.match(/\d+/)?.[0] === numericPart
+                ? "exact"
+                : "partial";
+            const seriesMatch = matchingIC.partNumber
+              .toLowerCase()
+              .startsWith(seriesPrefix);
+
             setDebugLogs((prev) => [
               ...prev,
               {
                 timestamp: new Date().toISOString(),
-                type: matchType === 'exact' ? "info" : "warning",
+                type: matchType === "exact" ? "info" : "warning",
                 message: `Selected IC ${matchingIC.partNumber} based on ${
-                  seriesMatch ? 'series and ' : ''
+                  seriesMatch ? "series and " : ""
                 }${matchType} numeric match: ${numericPart}${
-                  numericMatches.length > 1 
-                    ? `. Other possible matches: ${numericMatches.slice(1).map(ic => ic.partNumber).join(', ')}`
-                    : ''
+                  numericMatches.length > 1
+                    ? `. Other possible matches: ${numericMatches
+                        .slice(1)
+                        .map((ic) => ic.partNumber)
+                        .join(", ")}`
+                    : ""
                 }`,
               },
             ]);
@@ -524,17 +558,21 @@ export default function SerialPortInterface({
           // If no matches found, try more lenient matching
           const similarICs = allICs.filter((ic) => {
             const icDigits = ic.partNumber.match(/\d+/)?.[0];
-            const icPrefix = ic.partNumber.match(/^[a-zA-Z]+/)?.[0]?.toLowerCase() || '';
-            
+            const icPrefix =
+              ic.partNumber.match(/^[a-zA-Z]+/)?.[0]?.toLowerCase() || "";
+
             // Allow for any numeric overlap
-            return icDigits?.includes(numericPart) || numericPart.includes(icDigits || '');
+            return (
+              icDigits?.includes(numericPart) ||
+              numericPart.includes(icDigits || "")
+            );
           });
 
           if (similarICs.length > 0) {
             // Sort by closest match to numeric part
             similarICs.sort((a, b) => {
-              const aDigits = a.partNumber.match(/\d+/)?.[0] || '';
-              const bDigits = b.partNumber.match(/\d+/)?.[0] || '';
+              const aDigits = a.partNumber.match(/\d+/)?.[0] || "";
+              const bDigits = b.partNumber.match(/\d+/)?.[0] || "";
               const aDiff = Math.abs(parseInt(aDigits) - parseInt(numericPart));
               const bDiff = Math.abs(parseInt(bDigits) - parseInt(numericPart));
               return aDiff - bDiff;
@@ -546,7 +584,11 @@ export default function SerialPortInterface({
               {
                 timestamp: new Date().toISOString(),
                 type: "warning",
-                message: `No direct match found. Using similar IC ${similarIC.partNumber} for number: ${numericPart}. Available similar ICs: ${similarICs.map(ic => ic.partNumber).join(', ')}`,
+                message: `No direct match found. Using similar IC ${
+                  similarIC.partNumber
+                } for number: ${numericPart}. Available similar ICs: ${similarICs
+                  .map((ic) => ic.partNumber)
+                  .join(", ")}`,
               },
             ]);
             setSelectedIC(similarIC);
@@ -558,7 +600,9 @@ export default function SerialPortInterface({
               {
                 timestamp: new Date().toISOString(),
                 type: "error",
-                message: `No IC found matching number: ${icNumber}. Available ICs: ${allICs.map(ic => ic.partNumber).join(', ')}`,
+                message: `No IC found matching number: ${icNumber}. Available ICs: ${allICs
+                  .map((ic) => ic.partNumber)
+                  .join(", ")}. Please check the IC number and try again.`,
               },
             ]);
           }
@@ -568,7 +612,9 @@ export default function SerialPortInterface({
             {
               timestamp: new Date().toISOString(),
               type: "error",
-              message: `Invalid IC number format (no numeric part found): ${icNumber}. Expected format: e.g., "7400" or "74LS00". Available ICs: ${allICs.map(ic => ic.partNumber).join(', ')}`,
+              message: `Invalid IC number format (no numeric part found): ${icNumber}. Expected format: e.g., "7400" or "74LS00". Available ICs: ${allICs
+                .map((ic) => ic.partNumber)
+                .join(", ")}`,
             },
           ]);
         }
@@ -798,6 +844,98 @@ export default function SerialPortInterface({
       },
     ]);
   };
+
+  // Load IC data from JSON files
+  useEffect(() => {
+    const loadICData = async () => {
+      try {
+        const icFiles = [
+          'BCDDecoderIC.json',
+          'CounterIC.json',
+          'ShiftRegisterIC.json',
+          'arithmeticIc.json',
+          'combinationalIC.json',
+          'comparatorIc.json',
+          'sequentialIC.json'
+        ];
+
+        const allICData: ICData[] = [];
+
+        for (const file of icFiles) {
+          const response = await fetch(`/files/${file}`);
+          if (!response.ok) {
+            throw new Error(`Failed to load ${file}: ${response.statusText}`);
+          }
+          const data = await response.json();
+          if (!data || typeof data !== 'object') {
+            throw new Error(`Invalid data format in ${file}`);
+          }
+
+          // Extract ICs from nested structure with improved type checking
+          Object.values(data).forEach((series: any) => {
+            if (!series || typeof series !== 'object') {
+              console.warn('Invalid series data found, skipping...');
+              return;
+            }
+            Object.values(series).forEach((category: any) => {
+              if (!category || typeof category !== 'object') {
+                console.warn('Invalid category data found, skipping...');
+                return;
+              }
+              Object.values(category).forEach((ic: any) => {
+                if (!ic || typeof ic !== 'object') {
+                  console.warn('Invalid IC data found, skipping...');
+                  return;
+                }
+                // Validate required IC properties
+                if (
+                  ic.partNumber && typeof ic.partNumber === 'string' &&
+                  ic.description && typeof ic.description === 'string' &&
+                  ic.category && typeof ic.category === 'string' &&
+                  ic.pinCount && typeof ic.pinCount === 'number' &&
+                  Array.isArray(ic.pinConfiguration) &&
+                  ic.pinConfiguration.every((pin: any) =>
+                    pin &&
+                    typeof pin.pin === 'number' &&
+                    typeof pin.name === 'string' &&
+                    typeof pin.type === 'string' &&
+                    typeof pin.function === 'string'
+                  )
+                ) {
+                  allICData.push(ic as ICData);
+                } else {
+                  console.warn(`Skipping IC with invalid or missing properties: ${ic.partNumber || 'unknown'}`);
+                }
+              });
+            });
+          });
+        }
+
+        setAllICs(allICData);
+        setDebugLogs((prev) => [
+          ...prev,
+          {
+            timestamp: new Date().toISOString(),
+            type: "info",
+            message: `Successfully loaded ${allICData.length} ICs from ${icFiles.length} files. IC types: ${Array.from(new Set(allICData.map(ic => ic.category))).join(', ')}`,
+          },
+        ]);
+      } catch (error) {
+        console.error('Error loading IC data:', error);
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+        setDebugLogs((prev) => [
+          ...prev,
+          {
+            timestamp: new Date().toISOString(),
+            type: "error",
+            message: `Failed to load IC data: ${errorMessage}. Please check that all IC JSON files are present in /public/files/ and properly formatted.`,
+          },
+        ]);
+      }
+    };
+
+    loadICData();
+  }, []); // Run once when component mounts
 
   // Monitor port connection changes
   useEffect(() => {
