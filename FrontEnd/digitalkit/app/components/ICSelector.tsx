@@ -50,9 +50,16 @@ export default function ICSelector({
       const errors: string[] = [];
 
       try {
-        // Load all IC files in parallel
+        // Load all IC files in parallel with timeout
         const responses = await Promise.all(
-          files.map(file => fetch(`/files/${file}.json`))
+          files.map(file => 
+            Promise.race([
+              fetch(`/files/${file}.json`),
+              new Promise((_, reject) => 
+                setTimeout(() => reject(new Error('Timeout')), 5000)
+              )
+            ]).then(response => response as Response)
+          )
         );
 
         // Process each response
@@ -67,6 +74,17 @@ export default function ICSelector({
 
           try {
             const data: ICFile = await response.json();
+            
+            if (!data || typeof data !== 'object') {
+              errors.push(`Invalid data format in ${file}.json`);
+              continue;
+            }
+
+            // Check for 74SeriesICs structure
+            if (!data['74SeriesICs']) {
+              errors.push(`Missing 74SeriesICs data in ${file}.json`);
+              continue;
+            }
             
             // Flatten the nested structure and extract all ICs
             const extractICs = (obj: any) => {
@@ -95,8 +113,13 @@ export default function ICSelector({
             errors.push(`Error parsing ${file}.json: ${error}`);
           }
         }
-      } catch (error) {
-        errors.push(`Error loading IC files: ${error}`);
+      } catch (err) {
+        const error = err as Error;
+        if (error.message === 'Timeout') {
+          errors.push('Timeout while loading IC files. Please try again.');
+        } else {
+          errors.push(`Error loading IC files: ${error}`);
+        }
       }
 
       if (errors.length > 0) {

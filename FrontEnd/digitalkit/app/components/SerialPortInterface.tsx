@@ -80,7 +80,7 @@ export default function SerialPortInterface({
   const [debugLogs, setDebugLogs] = useState<
     Array<{
       timestamp: string;
-      type: "received" | "sent" | "info" | "error";
+      type: "received" | "sent" | "info" | "error" | "warning";
       message: string;
     }>
   >([]);
@@ -434,28 +434,123 @@ export default function SerialPortInterface({
       // Parse IC selection from the received data
       if (command.startsWith("IC:")) {
         const icNumber = command.substring(3).trim();
-        // Extract initial numeric part from received IC number
-        const numericPart = icNumber.match(/^\d+/)?.[0];
+        // Extract numeric part and series prefix from received IC number
+        const numericPart = icNumber.match(/\d+/)?.[0];
+        const seriesPrefix = icNumber.match(/^[a-zA-Z]+/)?.[0]?.toLowerCase() || '';
+        
         if (numericPart) {
-          // Find IC by matching the initial numeric part
-          const matchingIC = allICs.find((ic) =>
-            ic.partNumber.startsWith(numericPart)
+          // First try exact match (case insensitive)
+          const exactMatch = allICs.find((ic) => 
+            ic.partNumber.toLowerCase() === icNumber.toLowerCase()
           );
-          if (matchingIC) {
+          
+          if (exactMatch) {
             setDebugLogs((prev) => [
               ...prev,
               {
                 timestamp: new Date().toISOString(),
                 type: "info",
-                message: `Selected IC ${matchingIC.partNumber} based on received number ${numericPart}`,
+                message: `Found exact match for IC: ${exactMatch.partNumber}`,
               },
             ]);
+            setSelectedIC(exactMatch);
+            onICSelect?.(exactMatch);
+            sendData("PINS?\n");
+            return;
+          }
 
-            // Update IC selection
+          // Try numeric part match with series consideration
+          const numericMatches = allICs.filter((ic) => {
+            const icDigits = ic.partNumber.match(/\d+/)?.[0];
+            const icPrefix = ic.partNumber.match(/^[a-zA-Z]+/)?.[0]?.toLowerCase() || '';
+            
+            // If a series prefix was provided, it must match
+            if (seriesPrefix && icPrefix && seriesPrefix !== icPrefix) {
+              return false;
+            }
+            
+            // Allow for partial numeric matches (e.g., "74" matches "7400")
+            return icDigits?.startsWith(numericPart) || numericPart.startsWith(icDigits || '');
+          });
+
+          if (numericMatches.length >= 1) {
+            // Sort matches by closest numeric match
+            numericMatches.sort((a, b) => {
+              const aDigits = a.partNumber.match(/\d+/)?.[0] || '';
+              const bDigits = b.partNumber.match(/\d+/)?.[0] || '';
+              
+              // Prioritize exact numeric matches
+              if (aDigits === numericPart && bDigits !== numericPart) return -1;
+              if (bDigits === numericPart && aDigits !== numericPart) return 1;
+              
+              // Then prioritize prefix matches
+              const aPrefix = a.partNumber.match(/^[a-zA-Z]+/)?.[0]?.toLowerCase() || '';
+              const bPrefix = b.partNumber.match(/^[a-zA-Z]+/)?.[0]?.toLowerCase() || '';
+              if (seriesPrefix) {
+                if (aPrefix === seriesPrefix && bPrefix !== seriesPrefix) return -1;
+                if (bPrefix === seriesPrefix && aPrefix !== seriesPrefix) return 1;
+              }
+              
+              // Finally sort by numeric similarity
+              const aDiff = Math.abs(parseInt(aDigits) - parseInt(numericPart));
+              const bDiff = Math.abs(parseInt(bDigits) - parseInt(numericPart));
+              return aDiff - bDiff;
+            });
+
+            const matchingIC = numericMatches[0];
+            const matchType = matchingIC.partNumber.match(/\d+/)?.[0] === numericPart ? 'exact' : 'partial';
+            const seriesMatch = matchingIC.partNumber.toLowerCase().startsWith(seriesPrefix);
+            
+            setDebugLogs((prev) => [
+              ...prev,
+              {
+                timestamp: new Date().toISOString(),
+                type: matchType === 'exact' ? "info" : "warning",
+                message: `Selected IC ${matchingIC.partNumber} based on ${
+                  seriesMatch ? 'series and ' : ''
+                }${matchType} numeric match: ${numericPart}${
+                  numericMatches.length > 1 
+                    ? `. Other possible matches: ${numericMatches.slice(1).map(ic => ic.partNumber).join(', ')}`
+                    : ''
+                }`,
+              },
+            ]);
             setSelectedIC(matchingIC);
             onICSelect?.(matchingIC);
+            sendData("PINS?\n");
+            return;
+          }
 
-            // Request initial pin states
+          // If no matches found, try more lenient matching
+          const similarICs = allICs.filter((ic) => {
+            const icDigits = ic.partNumber.match(/\d+/)?.[0];
+            const icPrefix = ic.partNumber.match(/^[a-zA-Z]+/)?.[0]?.toLowerCase() || '';
+            
+            // Allow for any numeric overlap
+            return icDigits?.includes(numericPart) || numericPart.includes(icDigits || '');
+          });
+
+          if (similarICs.length > 0) {
+            // Sort by closest match to numeric part
+            similarICs.sort((a, b) => {
+              const aDigits = a.partNumber.match(/\d+/)?.[0] || '';
+              const bDigits = b.partNumber.match(/\d+/)?.[0] || '';
+              const aDiff = Math.abs(parseInt(aDigits) - parseInt(numericPart));
+              const bDiff = Math.abs(parseInt(bDigits) - parseInt(numericPart));
+              return aDiff - bDiff;
+            });
+
+            const similarIC = similarICs[0];
+            setDebugLogs((prev) => [
+              ...prev,
+              {
+                timestamp: new Date().toISOString(),
+                type: "warning",
+                message: `No direct match found. Using similar IC ${similarIC.partNumber} for number: ${numericPart}. Available similar ICs: ${similarICs.map(ic => ic.partNumber).join(', ')}`,
+              },
+            ]);
+            setSelectedIC(similarIC);
+            onICSelect?.(similarIC);
             sendData("PINS?\n");
           } else {
             setDebugLogs((prev) => [
@@ -463,7 +558,7 @@ export default function SerialPortInterface({
               {
                 timestamp: new Date().toISOString(),
                 type: "error",
-                message: `No IC found matching number: ${numericPart}`,
+                message: `No IC found matching number: ${icNumber}. Available ICs: ${allICs.map(ic => ic.partNumber).join(', ')}`,
               },
             ]);
           }
@@ -473,7 +568,7 @@ export default function SerialPortInterface({
             {
               timestamp: new Date().toISOString(),
               type: "error",
-              message: `Invalid IC number format: ${icNumber}`,
+              message: `Invalid IC number format (no numeric part found): ${icNumber}. Expected format: e.g., "7400" or "74LS00". Available ICs: ${allICs.map(ic => ic.partNumber).join(', ')}`,
             },
           ]);
         }
@@ -743,6 +838,100 @@ export default function SerialPortInterface({
 
   return (
     <div className="space-y-6">
+      {/* Debug Log - Moved to top */}
+      <div className="p-6 bg-white dark:bg-gray-800 rounded-xl shadow-md border-2 border-blue-500">
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-xl font-bold dark:text-white flex items-center">
+            <span className="mr-2">🔍</span>
+            Debug Log
+          </h2>
+          <div className="flex space-x-2">
+            <button
+              onClick={() => setDebugLogs([])}
+              className="px-3 py-1 text-sm bg-red-100 text-red-800 rounded hover:bg-red-200 dark:bg-red-900 dark:text-red-100 dark:hover:bg-red-800"
+            >
+              Clear Log
+            </button>
+            <button
+              onClick={() => {
+                if (isConnected) {
+                  sendData("SYNC\n");
+                }
+              }}
+              disabled={!isConnected}
+              className="px-3 py-1 text-sm bg-blue-100 text-blue-800 rounded hover:bg-blue-200 dark:bg-blue-900 dark:text-blue-100 dark:hover:bg-blue-800 disabled:opacity-50"
+            >
+              Request Sync
+            </button>
+            <button
+              onClick={() => {
+                setDebugLogs((prev) => [
+                  ...prev,
+                  {
+                    timestamp: new Date().toISOString(),
+                    type: "info",
+                    message: `Current buffer content: "${commandBufferRef.current}"`,
+                  },
+                ]);
+              }}
+              className="px-3 py-1 text-sm bg-yellow-100 text-yellow-800 rounded hover:bg-yellow-200 dark:bg-yellow-900 dark:text-yellow-100 dark:hover:bg-yellow-800"
+            >
+              Show Buffer
+            </button>
+          </div>
+        </div>
+
+        <div className="h-64 overflow-y-auto border rounded dark:border-gray-700 bg-gray-50 dark:bg-gray-900">
+          <div className="sticky top-0 bg-gray-100 dark:bg-gray-800 border-b dark:border-gray-700">
+            <div className="grid grid-cols-12 gap-2 px-4 py-2 text-xs font-medium text-gray-500 dark:text-gray-400">
+              <div className="col-span-2">Time</div>
+              <div className="col-span-2">Type</div>
+              <div className="col-span-8">Message</div>
+            </div>
+          </div>
+
+          <div className="divide-y divide-gray-200 dark:divide-gray-700">
+            {debugLogs
+              .slice()
+              .reverse()
+              .map((log, index) => (
+                <div
+                  key={index}
+                  className="grid grid-cols-12 gap-2 px-4 py-2 text-sm hover:bg-white dark:hover:bg-gray-800"
+                >
+                  <div className="col-span-2 text-gray-500 dark:text-gray-400">
+                    {new Date(log.timestamp).toLocaleTimeString()}
+                  </div>
+                  <div className="col-span-2">
+                    <span
+                      className={`inline-block px-2 py-0.5 text-xs rounded-full ${
+                        log.type === "received"
+                          ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100"
+                          : log.type === "sent"
+                          ? "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-100"
+                          : log.type === "info"
+                          ? "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-100"
+                          : "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-100"
+                      }`}
+                    >
+                      {log.type}
+                    </span>
+                  </div>
+                  <div className="col-span-8 font-mono text-gray-900 dark:text-gray-100 break-all">
+                    {log.message}
+                  </div>
+                </div>
+              ))}
+          </div>
+        </div>
+
+        {debugLogs.length === 0 && (
+          <div className="text-center p-4 text-gray-500 dark:text-gray-400">
+            No debug messages yet
+          </div>
+        )}
+      </div>
+
       {/* Serial Port Connection */}
       <div className="p-6 bg-white dark:bg-gray-800 rounded-xl shadow-md">
         <h2 className="text-xl font-bold mb-4 dark:text-white">
@@ -828,6 +1017,7 @@ export default function SerialPortInterface({
                 ic={selectedIC}
                 onPinStateChange={handlePinStateChange}
                 serialConnected={isConnected}
+                currentPinStates={pinStates}
               />
             </div>
             <ICTruthTableVerifier

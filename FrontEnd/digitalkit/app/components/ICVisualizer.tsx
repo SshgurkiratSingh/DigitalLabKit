@@ -21,18 +21,29 @@ interface ICVisualizerProps {
   ic: ICData | null;
   onPinStateChange?: (pinStates: { [key: number]: boolean }) => void;
   serialConnected: boolean;
+  currentPinStates?: { [key: number]: boolean }; // Add this prop
 }
 
 export default function ICVisualizer({
   ic,
   onPinStateChange,
   serialConnected,
+  currentPinStates = {},
 }: ICVisualizerProps) {
-  // Remove local state management to avoid conflicts
-  const pinStates = ic?.pinConfiguration.reduce((acc, pin) => {
-    acc[pin.pin] = false;
-    return acc;
-  }, {} as { [key: number]: boolean }) || {};
+  // Add local state to track pin states
+  const [localPinStates, setLocalPinStates] = useState<{ [key: number]: boolean }>({});
+
+  // Update local pin states when IC changes or when currentPinStates changes
+  useEffect(() => {
+    if (ic) {
+      const newStates = { ...localPinStates };
+      ic.pinConfiguration.forEach(pin => {
+        // Use currentPinStates if available, otherwise keep existing state or default to false
+        newStates[pin.pin] = currentPinStates[pin.pin] ?? localPinStates[pin.pin] ?? false;
+      });
+      setLocalPinStates(newStates);
+    }
+  }, [ic, currentPinStates]);
 
   if (!ic) {
     return null;
@@ -43,15 +54,17 @@ export default function ICVisualizer({
 
     if (onPinStateChange) {
       const newStates = {
-        ...pinStates,
-        [pinNumber]: !pinStates[pinNumber],
+        ...localPinStates,
+        [pinNumber]: !localPinStates[pinNumber],
       };
-      onPinStateChange(newStates);
+      setLocalPinStates(newStates); // Update local state immediately
+      onPinStateChange(newStates); // Notify parent
     }
   };
 
-  const getPinColor = (pinType: string, state: boolean) => {
+  const getPinColor = (pinType: string, pinNumber: number) => {
     if (pinType === "POWER") return "bg-yellow-500";
+    const state = localPinStates[pinNumber] ?? false;
     if (pinType === "INPUT") return state ? "bg-green-500" : "bg-red-500";
     if (pinType === "OUTPUT") return state ? "bg-blue-500" : "bg-gray-500";
     return "bg-gray-400";
@@ -78,7 +91,7 @@ export default function ICVisualizer({
               <div
                 className={`w-6 h-6 rounded-full ${getPinColor(
                   pin.type,
-                  pinStates[pin.pin]
+                  pin.pin
                 )} ${
                   pin.type === "INPUT" && serialConnected
                     ? "cursor-pointer hover:opacity-80"
@@ -113,7 +126,7 @@ export default function ICVisualizer({
               <div
                 className={`w-6 h-6 rounded-full ${getPinColor(
                   pin.type,
-                  pinStates[pin.pin]
+                  pin.pin
                 )} ${
                   pin.type === "INPUT" && serialConnected
                     ? "cursor-pointer hover:opacity-80"
