@@ -24,6 +24,7 @@ export default function ICTruthTableVerifier({
   const [selectedFrequency, setSelectedFrequency] = useState<number>(0);
   const [autoVerify, setAutoVerify] = useState(false);
   const [currentEntry, setCurrentEntry] = useState<number>(0);
+  const [verificationPhase, setVerificationPhase] = useState<'input' | 'output' | null>(null);
 
   const [icData, setICData] = useState<ICTruthTable | null>(null);
 
@@ -55,6 +56,8 @@ export default function ICTruthTableVerifier({
 
     const entry = icData.truthTable[currentEntry];
     const failures: string[] = [];
+    const pinStatesLog: string[] = [];
+    const currentGate = Math.floor(currentEntry / 4) + 1; // Assuming 4 test cases per gate
 
     // For sequential ICs, check if clock is properly configured
     if (icData.type === 'sequential' && selectedFrequency === 0) {
@@ -66,17 +69,40 @@ export default function ICTruthTableVerifier({
       return;
     }
 
-    // For combinational ICs, handle verification with serial device response
-    if (icData.type !== 'sequential') {
-      const pinStatesLog: string[] = [];
-      const failures: string[] = [];
-      let allPinsValid = true;
-      let hasAllRequiredStates = true;
-      let waitingForDevice = false;
+    // Log all current pin states
+    Object.entries(currentPinStates).forEach(([pinNumber, state]) => {
+      const pinConfig = icData.pinConfiguration?.find(p => p.pin === parseInt(pinNumber));
+      if (pinConfig) {
+        pinStatesLog.push(`Current State: Pin ${pinConfig.name} (${pinNumber}): ${state ? 'HIGH' : 'LOW'}`);
+      }
+    });
 
-      // First verify that all required input pins have states set
+    // Add gate information to the log
+    if (icData.functional?.gateCount) {
+      pinStatesLog.unshift(`Testing Gate ${currentGate} of ${icData.functional.gateCount}`);
+    }
+
+    // Phase 1: Input Verification
+    if (verificationPhase === null || verificationPhase === 'input') {
+      // Display expected input states and wait for user to set them
+      const expectedInputsLog: string[] = [];
+      const currentGateInputs = Object.entries(entry.inputs).filter(([pin]) => {
+        const pinConfig = icData.pinConfiguration?.find(p => p.name === pin);
+        // Filter inputs for current gate based on pin naming convention (e.g., 1A, 1B for gate 1)
+        return pinConfig && pin.startsWith(currentGate.toString());
+      });
+
+      currentGateInputs.forEach(([pin, expectedState]) => {
+        const pinConfig = icData.pinConfiguration?.find(p => p.name === pin);
+        if (pinConfig) {
+          expectedInputsLog.push(`Expected Input: Pin ${pin} (${pinConfig.pin}) should be ${expectedState ? 'HIGH' : 'LOW'}`);
+        }
+      });
+
+      // Check if all required input pins have states set
       const requiredInputs = new Set(Object.keys(entry.inputs));
       const missingInputs: string[] = [];
+      let hasAllRequiredStates = true;
       
       requiredInputs.forEach(inputName => {
         const pinConfig = icData.pinConfiguration?.find(p => p.name === inputName);
@@ -89,129 +115,165 @@ export default function ICTruthTableVerifier({
         }
       });
 
-      // Log all current pin states
-      Object.entries(currentPinStates).forEach(([pinNumber, state]) => {
-        const pinConfig = icData.pinConfiguration?.find(p => p.pin === parseInt(pinNumber));
-        if (pinConfig) {
-          pinStatesLog.push(`Pin ${pinConfig.name} (${pinNumber}): ${state ? 'HIGH' : 'LOW'}`);
-        }
-      });
-
-      // Check if we're waiting for device response
-      const outputPins = icData.pinConfiguration.filter(p => p.type === 'OUTPUT');
-      const hasOutputStates = outputPins.some(p => typeof currentPinStates[p.pin] === 'boolean');
-      waitingForDevice = !hasOutputStates;
-
-      // If we're missing input states, wait for them
       if (!hasAllRequiredStates) {
         setVerificationResults({
           passed: false,
           failures: [
-            'Pin States:',
+            'Please set the following input states:',
+            ...expectedInputsLog,
+            '',
+            'Current Pin States:',
             ...pinStatesLog,
             '',
-            'Verification Results:',
             `Missing required input states for pins: ${missingInputs.join(', ')}`,
-            'Waiting for all input states to be set...'
+            'Set all inputs according to the expected values and verify again.'
           ]
         });
+        setVerificationPhase('input');
         return;
       }
 
-      // If we have all inputs but no outputs, we're waiting for device response
-      if (waitingForDevice) {
+      // Check if all inputs are set correctly
+      let allInputsCorrect = true;
+      const inputErrors: string[] = [];
+      Object.entries(entry.inputs).forEach(([pin, expectedState]) => {
+        const pinConfig = icData.pinConfiguration?.find(p => p.name === pin);
+        if (pinConfig) {
+          const pinNumber = pinConfig.pin;
+          const actualState = currentPinStates[pinNumber];
+          if (actualState !== expectedState) {
+            allInputsCorrect = false;
+            inputErrors.push(`Input pin ${pin} (${pinNumber}): Expected ${expectedState ? 'HIGH' : 'LOW'}, got ${actualState ? 'HIGH' : 'LOW'}`);
+          }
+        }
+      });
+
+      if (!allInputsCorrect) {
         setVerificationResults({
           passed: false,
           failures: [
-            'Pin States:',
+            'Input states do not match expected values:',
+            ...expectedInputsLog,
+            '',
+            'Current Pin States:',
             ...pinStatesLog,
             '',
-            'Verification Results:',
-            'All input pins set correctly',
-            'Waiting for device response...'
+            'Errors:',
+            ...inputErrors,
+            '',
+            'Please correct the input states and verify again.'
           ]
         });
+        setVerificationPhase('input');
         return;
       }
 
-      // Then verify output pins if we have received data from the device
-      if (Object.keys(currentPinStates).length > 0) {
-        // First verify that input states match what we expect
-        Object.entries(entry.inputs).forEach(([pin, expectedState]) => {
-          const pinConfig = icData.pinConfiguration?.find(p => p.name === pin);
-          if (!pinConfig) return;
-
-          const pinNumber = pinConfig.pin;
-          const actualState = currentPinStates[pinNumber];
-
-          if (typeof actualState === 'boolean' && typeof expectedState === 'boolean') {
-            if (actualState !== expectedState) {
-              failures.push(`Input pin ${pin} (${pinNumber}) not in expected state: Expected ${expectedState ? 'HIGH' : 'LOW'}, got ${actualState ? 'HIGH' : 'LOW'}`);
-              allPinsValid = false;
-            }
-          }
-        });
-
-        // Then verify output pins with tolerance for device response delay
-        Object.entries(entry.outputs).forEach(([pin, expectedState]) => {
-          const pinConfig = icData.pinConfiguration?.find(p => p.name === pin);
-          if (!pinConfig) return;
-
-          const pinNumber = pinConfig.pin;
-          const actualState = currentPinStates[pinNumber];
-
-          // Only verify if we have a valid state for this pin
-          if (typeof actualState === 'boolean' && typeof expectedState === 'boolean') {
-            if (actualState !== expectedState) {
-              failures.push(`Output pin ${pin} (${pinNumber}): Expected ${expectedState ? 'HIGH' : 'LOW'}, got ${actualState ? 'HIGH' : 'LOW'}`);
-              allPinsValid = false;
-            }
-          } else {
-            failures.push(`Output pin ${pin} (${pinNumber}): No valid state received from device`);
-            allPinsValid = false;
-          }
-        });
-      }
-
+      // If all inputs are correct, move to output phase
+      setVerificationPhase('output');
       setVerificationResults({
-        passed: allPinsValid,
+        passed: false,
         failures: [
-          'Pin States:',
-          ...pinStatesLog,
-          ...(failures.length > 0 ? ['', 'Verification Results:', ...failures] : [])
+          'Input states verified correctly!',
+          '',
+          'Waiting for device output...',
+          '',
+          'Expected Output States:',
+          ...Object.entries(entry.outputs).map(([pin, expectedState]) => {
+            const pinConfig = icData.pinConfiguration?.find(p => p.name === pin);
+            return pinConfig ? 
+              `Pin ${pin} (${pinConfig.pin}) should be ${expectedState ? 'HIGH' : 'LOW'}` : '';
+          }).filter(s => s)
         ]
       });
       return;
     }
 
-    // For sequential ICs, proceed with normal verification
-    Object.entries(entry.outputs).forEach(([pin, expectedState]) => {
-      const pinConfig = icData.pinConfiguration?.find(p => p.name === pin);
-      if (!pinConfig) return;
+    // Phase 2: Output Verification
+    if (verificationPhase === 'output') {
+      // Check if we have output states from device
+      const currentGateOutputs = icData.pinConfiguration.filter(p => 
+        p.type === 'OUTPUT' && p.name.startsWith(currentGate.toString())
+      );
+      const hasOutputStates = currentGateOutputs.some(p => typeof currentPinStates[p.pin] === 'boolean');
 
-      const pinNumber = pinConfig.pin;
-      const actualState = currentPinStates[pinNumber];
-      
-      // Skip verification if clock is transitioning
-      if (pin.includes('CLK')) return;
-      
-      // For flip-flops/latches with previous state dependency
-      if (typeof expectedState === 'string' && (expectedState === 'Qprev' || expectedState === 'QBprev')) {
-        // Skip verification as it depends on previous state
+      if (!hasOutputStates) {
+        setVerificationResults({
+          passed: false,
+          failures: [
+            `Testing Gate ${currentGate} of ${icData.functional?.gateCount}`,
+            'Input states are correct.',
+            '',
+            'Waiting for device to provide output states...',
+            '',
+            'Expected Output States for Current Gate:',
+            ...Object.entries(entry.outputs)
+              .filter(([pin]) => pin.startsWith(currentGate.toString()))
+              .map(([pin, expectedState]) => {
+                const pinConfig = icData.pinConfiguration?.find(p => p.name === pin);
+                return pinConfig ? 
+                  `Pin ${pin} (${pinConfig.pin}) should be ${expectedState ? 'HIGH' : 'LOW'}` : '';
+              }).filter(s => s)
+          ]
+        });
         return;
       }
 
-      if (typeof expectedState === 'boolean' && actualState !== expectedState) {
-        failures.push(
-          `Pin ${pin} (${pinNumber}): Expected ${expectedState ? 'HIGH' : 'LOW'}, got ${actualState ? 'HIGH' : 'LOW'}`
-        );
-      }
-    });
+      // Verify output pins match truth table
+      const outputVerificationResults: string[] = [];
+      let allOutputsCorrect = true;
+      let currentGateOutputsCorrect = true;
 
-    setVerificationResults({
-      passed: failures.length === 0,
-      failures
-    });
+      Object.entries(entry.outputs).forEach(([pin, expectedState]) => {
+        const pinConfig = icData.pinConfiguration?.find(p => p.name === pin);
+        if (pinConfig) {
+          const pinNumber = pinConfig.pin;
+          const actualState = currentPinStates[pinNumber];
+          const isCurrentGatePin = pin.startsWith(currentGate.toString());
+          
+          if (typeof actualState === 'boolean' && typeof expectedState === 'boolean') {
+            if (actualState !== expectedState) {
+              outputVerificationResults.push(
+                `Output pin ${pin} (${pinNumber}): Expected ${expectedState ? 'HIGH' : 'LOW'}, got ${actualState ? 'HIGH' : 'LOW'}`
+              );
+              allOutputsCorrect = false;
+              if (isCurrentGatePin) {
+                currentGateOutputsCorrect = false;
+              }
+            }
+          } else if (isCurrentGatePin) {
+            outputVerificationResults.push(`Output pin ${pin} (${pinNumber}): No valid state received from device`);
+            allOutputsCorrect = false;
+            currentGateOutputsCorrect = false;
+          }
+        }
+      });
+
+      setVerificationResults({
+        passed: allOutputsCorrect,
+        failures: [
+          `Testing Gate ${currentGate} of ${icData.functional?.gateCount}`,
+          '',
+          'Input States:',
+          ...Object.entries(entry.inputs)
+            .filter(([pin]) => pin.startsWith(currentGate.toString()))
+            .map(([pin, state]) => {
+              const pinConfig = icData.pinConfiguration?.find(p => p.name === pin);
+              return pinConfig ? 
+                `Pin ${pin} (${pinConfig.pin}): ${state ? 'HIGH' : 'LOW'}` : '';
+            }).filter(s => s),
+          '',
+          'Output Verification Results:',
+          ...(currentGateOutputsCorrect 
+            ? [`Gate ${currentGate} outputs match expected truth table values!`] 
+            : outputVerificationResults.filter(msg => msg.includes(`${currentGate}`)))
+        ]
+      });
+
+      // Reset phase for next verification if all outputs are correct
+      if (currentGateOutputsCorrect) {
+        setVerificationPhase(null);
+      }
+    }
   };
 
   // Apply truth table entry to pins
@@ -241,6 +303,9 @@ export default function ICTruthTableVerifier({
       newPinStates[icData.clockPin] = false;
     }
 
+    // Reset verification phase when applying new inputs
+    setVerificationPhase('input');
+    
     onPinStateChange(newPinStates);
   };
 
@@ -249,6 +314,7 @@ export default function ICTruthTableVerifier({
     if (!icData) return;
     const nextIndex = (currentEntry + 1) % icData.truthTable.length;
     setCurrentEntry(nextIndex);
+    setVerificationPhase(null); // Reset phase before applying new entry
     applyTruthTableEntry(icData.truthTable[nextIndex]);
   };
 
@@ -257,68 +323,42 @@ export default function ICTruthTableVerifier({
     let interval: NodeJS.Timeout;
     
     if (autoVerify && isConnected && icData) {
-      if (icData.type === 'sequential') {
-        // For sequential ICs, use clock-based verification
-        const verificationInterval = Math.floor(1000 / selectedFrequency) * 2; // Double the clock period
-
-        interval = setInterval(() => {
-          if (icData.clockPin) {
-            const newPinStates = { ...currentPinStates };
-            const clockPin = icData.clockPin;
-            
-            // Set clock high
-            newPinStates[clockPin] = true;
-            onPinStateChange(newPinStates);
-
-            // Wait for half period, then set clock low and verify
-            setTimeout(() => {
-              newPinStates[clockPin] = false;
-              onPinStateChange(newPinStates);
-              
-              // Verify after a small delay to allow for propagation
-              setTimeout(() => {
-                verifyCurrentState();
-                nextEntry();
-              }, 50);
-            }, verificationInterval / 2);
-          }
-        }, verificationInterval);
-      } else {
-        // For combinational ICs, apply inputs and wait for serial device response
-        interval = setInterval(() => {
-          // Apply the current truth table entry inputs
-          const entry = icData.truthTable[currentEntry];
+      interval = setInterval(() => {
+        const entry = icData.truthTable[currentEntry];
+        const currentGate = Math.floor(currentEntry / 4) + 1;
+        
+        // Phase 1: Set inputs and wait for verification
+        if (verificationPhase === null || verificationPhase === 'input') {
+          // Apply inputs for current gate
           applyTruthTableEntry(entry);
-          
-          // Wait for device response with progressive checks
-          let attempts = 0;
-          const maxAttempts = 5;
-          const checkInterval = setInterval(() => {
-            attempts++;
-            
-            // Check if we have output states
-            const outputPins = icData.pinConfiguration.filter(p => p.type === 'OUTPUT');
-            const hasOutputStates = outputPins.some(p => typeof currentPinStates[p.pin] === 'boolean');
-            
-            if (hasOutputStates) {
-              // We have output states, verify and move on
-              clearInterval(checkInterval);
-              verifyCurrentState();
-              setTimeout(() => nextEntry(), 200); // Small delay before next test case
-            } else if (attempts >= maxAttempts) {
-              // No response after max attempts, log error and move on
-              console.log(`No response from device after ${attempts} attempts for IC ${selectedIC}`);
-              clearInterval(checkInterval);
-              setVerificationResults({
-                passed: false,
-                failures: ['No response from device after multiple attempts']
-              });
-              setTimeout(() => nextEntry(), 200);
-            }
-          }, 300); // Check every 300ms
-          
-        }, 2000); // Test a new case every 2s to ensure enough time for serial response and verification
-      }
+          verifyCurrentState(); // This will handle input phase
+        }
+        // Phase 2: Only proceed when inputs are verified
+        else if (verificationPhase === 'output') {
+          verifyCurrentState(); // This will handle output phase
+          if (verificationResults?.passed) {
+            // Move to next test case after successful verification
+            setTimeout(() => {
+              // Check if we've completed all test cases for the current gate
+              const nextEntry = currentEntry + 1;
+              const nextGate = Math.floor(nextEntry / 4) + 1;
+              
+              if (nextGate > (icData.functional?.gateCount || 1)) {
+                // All gates tested, stop auto-verify
+                setAutoVerify(false);
+                setVerificationResults({
+                  passed: true,
+                  failures: ['All gates have been successfully verified!']
+                });
+              } else {
+                // Move to next test case
+                nextEntry();
+                setVerificationPhase(null);
+              }
+            }, 1500);
+          }
+        }
+      }, 3000);
     }
 
     return () => {
@@ -326,7 +366,7 @@ export default function ICTruthTableVerifier({
         clearInterval(interval);
       }
     };
-  }, [autoVerify, isConnected, currentEntry, icData, selectedFrequency]);
+  }, [autoVerify, isConnected, currentEntry, icData, verificationPhase]);
 
   if (!selectedIC || !icData) {
     return null;
