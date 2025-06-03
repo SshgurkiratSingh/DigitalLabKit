@@ -74,8 +74,8 @@ export default function ICVisualizer({
   const rightPins = ic.pinConfiguration.slice(ic.pinCount / 2).reverse();
 
   return (
-    <div className="p-4 bg-white dark:bg-gray-800 rounded-lg shadow">
-      <h3 className="text-lg font-semibold mb-4 dark:text-white">
+    <div className="p-4 bg-[var(--background)] rounded-lg shadow w-full">
+      <h3 className="text-lg font-semibold mb-4 text-[var(--foreground)]">
         {ic.partNumber} - {ic.description}
       </h3>
       
@@ -102,7 +102,7 @@ export default function ICVisualizer({
                   {pin.pin}
                 </span>
               </div>
-              <span className="text-sm dark:text-white">
+              <span className="text-sm text-[var(--foreground)]">
                 {pin.name} ({pin.type})
               </span>
             </div>
@@ -110,7 +110,7 @@ export default function ICVisualizer({
         </div>
 
         {/* IC Body */}
-        <div className="w-20 bg-gray-300 dark:bg-gray-600 mx-4"></div>
+        <div className="w-20 bg-neutral-700 mx-4"></div>
 
         {/* Right side pins */}
         <div className="space-y-2">
@@ -120,7 +120,7 @@ export default function ICVisualizer({
               className="flex items-center space-x-2 cursor-pointer"
               onClick={() => togglePin(pin.pin, pin.type)}
             >
-              <span className="text-sm text-right dark:text-white">
+              <span className="text-sm text-right text-[var(--foreground)]">
                 {pin.name} ({pin.type})
               </span>
               <div
@@ -143,27 +143,27 @@ export default function ICVisualizer({
       </div>
 
       <div className="mt-4">
-        <h4 className="text-sm font-semibold mb-2 dark:text-white">Legend:</h4>
+        <h4 className="text-sm font-semibold mb-2 text-[var(--foreground)]">Legend:</h4>
         <div className="flex space-x-4">
           <div className="flex items-center">
             <div className="w-4 h-4 rounded-full bg-yellow-500 mr-2"></div>
-            <span className="text-sm dark:text-white">Power</span>
+            <span className="text-sm text-[var(--foreground)]">Power</span>
           </div>
           <div className="flex items-center">
             <div className="w-4 h-4 rounded-full bg-red-500 mr-2"></div>
-            <span className="text-sm dark:text-white">Input (Low)</span>
+            <span className="text-sm text-[var(--foreground)]">Input (Low)</span>
           </div>
           <div className="flex items-center">
             <div className="w-4 h-4 rounded-full bg-green-500 mr-2"></div>
-            <span className="text-sm dark:text-white">Input (High)</span>
+            <span className="text-sm text-[var(--foreground)]">Input (High)</span>
           </div>
           <div className="flex items-center">
             <div className="w-4 h-4 rounded-full bg-gray-500 mr-2"></div>
-            <span className="text-sm dark:text-white">Output (Low)</span>
+            <span className="text-sm text-[var(--foreground)]">Output (Low)</span>
           </div>
           <div className="flex items-center">
             <div className="w-4 h-4 rounded-full bg-blue-500 mr-2"></div>
-            <span className="text-sm dark:text-white">Output (High)</span>
+            <span className="text-sm text-[var(--foreground)]">Output (High)</span>
           </div>
         </div>
       </div>
