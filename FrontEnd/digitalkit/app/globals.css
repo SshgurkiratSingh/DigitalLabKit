@@ -1,26 +1,14 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
+  /* Define CSS variables if needed elsewhere, but primary styling via Tailwind */
+  --font-sans: var(--font-geist-sans); /* Assuming these are defined elsewhere or through a plugin */
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
+/* Remove @theme inline as it might conflict or be redundant */
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  @apply bg-dark-bg text-light-text;
+  font-family: Arial, Helvetica, sans-serif; /* Keep existing font-family */
 }

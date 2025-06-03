@@ -62,108 +62,127 @@ export default function ICVisualizer({
     }
   };
 
-  const getPinColor = (pinType: string, pinNumber: number) => {
-    if (pinType === "POWER") return "bg-yellow-500";
+  const getPinStyle = (pinType: string, pinNumber: number) => {
     const state = localPinStates[pinNumber] ?? false;
-    if (pinType === "INPUT") return state ? "bg-green-500" : "bg-red-500";
-    if (pinType === "OUTPUT") return state ? "bg-blue-500" : "bg-gray-500";
-    return "bg-gray-400";
+    let bgColor = "";
+    let textColor = "text-white"; // Default text color
+
+    if (pinType === "POWER") {
+      bgColor = "bg-neon-blue";
+    } else if (pinType === "INPUT") {
+      if (state) {
+        bgColor = "bg-neon-green";
+        textColor = "text-dark-bg"; // Neon green needs dark text for contrast
+      } else {
+        bgColor = "bg-neon-pink";
+      }
+    } else if (pinType === "OUTPUT") {
+      if (state) {
+        bgColor = "bg-neon-green"; // Using neon-green for Output High as well
+        textColor = "text-dark-bg";
+      } else {
+        bgColor = "bg-medium-text bg-opacity-50";
+      }
+    } else {
+      bgColor = "bg-medium-text bg-opacity-30";
+    }
+    return { bgColor, textColor };
   };
 
   const leftPins = ic.pinConfiguration.slice(0, ic.pinCount / 2);
   const rightPins = ic.pinConfiguration.slice(ic.pinCount / 2).reverse();
 
   return (
-    <div className="p-4 bg-white dark:bg-gray-800 rounded-lg shadow">
-      <h3 className="text-lg font-semibold mb-4 dark:text-white">
+    <div className="p-4 bg-dark-card rounded-lg shadow">
+      <h3 className="text-lg font-semibold mb-4 text-neon-pink">
         {ic.partNumber} - {ic.description}
       </h3>
       
       <div className="flex justify-between">
         {/* Left side pins */}
         <div className="space-y-2">
-          {leftPins.map((pin) => (
-            <div
-              key={pin.pin}
-              className="flex items-center space-x-2 cursor-pointer"
-              onClick={() => togglePin(pin.pin, pin.type)}
-            >
+          {leftPins.map((pin) => {
+            const { bgColor, textColor } = getPinStyle(pin.type, pin.pin);
+            return (
               <div
-                className={`w-6 h-6 rounded-full ${getPinColor(
-                  pin.type,
-                  pin.pin
-                )} ${
-                  pin.type === "INPUT" && serialConnected
-                    ? "cursor-pointer hover:opacity-80"
-                    : ""
-                }`}
+                key={pin.pin}
+                className="flex items-center space-x-2 cursor-pointer"
+                onClick={() => togglePin(pin.pin, pin.type)}
               >
-                <span className="flex items-center justify-center text-white text-sm">
-                  {pin.pin}
+                <div
+                  className={`w-6 h-6 rounded-full ${bgColor} ${
+                    pin.type === "INPUT" && serialConnected
+                      ? "cursor-pointer hover:opacity-80"
+                      : ""
+                  }`}
+                >
+                  <span className={`flex items-center justify-center ${textColor} text-sm`}>
+                    {pin.pin}
+                  </span>
+                </div>
+                <span className="text-sm text-light-text">
+                  {pin.name} ({pin.type})
                 </span>
               </div>
-              <span className="text-sm dark:text-white">
-                {pin.name} ({pin.type})
-              </span>
-            </div>
-          ))}
+            );
+          })}
         </div>
 
         {/* IC Body */}
-        <div className="w-20 bg-gray-300 dark:bg-gray-600 mx-4"></div>
+        <div className="w-20 bg-dark-bg mx-4"></div>
 
         {/* Right side pins */}
         <div className="space-y-2">
-          {rightPins.map((pin) => (
-            <div
-              key={pin.pin}
-              className="flex items-center space-x-2 cursor-pointer"
-              onClick={() => togglePin(pin.pin, pin.type)}
-            >
-              <span className="text-sm text-right dark:text-white">
-                {pin.name} ({pin.type})
-              </span>
+          {rightPins.map((pin) => {
+            const { bgColor, textColor } = getPinStyle(pin.type, pin.pin);
+            return (
               <div
-                className={`w-6 h-6 rounded-full ${getPinColor(
-                  pin.type,
-                  pin.pin
-                )} ${
-                  pin.type === "INPUT" && serialConnected
-                    ? "cursor-pointer hover:opacity-80"
-                    : ""
-                }`}
+                key={pin.pin}
+                className="flex items-center space-x-2 cursor-pointer"
+                onClick={() => togglePin(pin.pin, pin.type)}
               >
-                <span className="flex items-center justify-center text-white text-sm">
-                  {pin.pin}
+                <span className="text-sm text-right text-light-text">
+                  {pin.name} ({pin.type})
                 </span>
+                <div
+                  className={`w-6 h-6 rounded-full ${bgColor} ${
+                    pin.type === "INPUT" && serialConnected
+                      ? "cursor-pointer hover:opacity-80"
+                      : ""
+                  }`}
+                >
+                  <span className={`flex items-center justify-center ${textColor} text-sm`}>
+                    {pin.pin}
+                  </span>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
 
       <div className="mt-4">
-        <h4 className="text-sm font-semibold mb-2 dark:text-white">Legend:</h4>
-        <div className="flex space-x-4">
+        <h4 className="text-sm font-semibold mb-2 text-light-text">Legend:</h4>
+        <div className="flex flex-wrap gap-x-4 gap-y-2">
           <div className="flex items-center">
-            <div className="w-4 h-4 rounded-full bg-yellow-500 mr-2"></div>
-            <span className="text-sm dark:text-white">Power</span>
+            <div className="w-4 h-4 rounded-full bg-neon-blue mr-2"></div>
+            <span className="text-sm text-light-text">Power</span>
           </div>
           <div className="flex items-center">
-            <div className="w-4 h-4 rounded-full bg-red-500 mr-2"></div>
-            <span className="text-sm dark:text-white">Input (Low)</span>
+            <div className="w-4 h-4 rounded-full bg-neon-pink mr-2"></div>
+            <span className="text-sm text-light-text">Input (Low)</span>
           </div>
           <div className="flex items-center">
-            <div className="w-4 h-4 rounded-full bg-green-500 mr-2"></div>
-            <span className="text-sm dark:text-white">Input (High)</span>
+            <div className="w-4 h-4 rounded-full bg-neon-green mr-2"></div>
+            <span className="text-sm text-light-text">Input (High)</span>
           </div>
           <div className="flex items-center">
-            <div className="w-4 h-4 rounded-full bg-gray-500 mr-2"></div>
-            <span className="text-sm dark:text-white">Output (Low)</span>
+            <div className="w-4 h-4 rounded-full bg-medium-text bg-opacity-50 mr-2"></div>
+            <span className="text-sm text-light-text">Output (Low)</span>
           </div>
           <div className="flex items-center">
-            <div className="w-4 h-4 rounded-full bg-blue-500 mr-2"></div>
-            <span className="text-sm dark:text-white">Output (High)</span>
+            <div className="w-4 h-4 rounded-full bg-neon-green mr-2"></div> {/* Output High also neon-green */}
+            <span className="text-sm text-light-text">Output (High)</span>
           </div>
         </div>
       </div>

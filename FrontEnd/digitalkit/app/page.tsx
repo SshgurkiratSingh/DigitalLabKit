@@ -9,20 +9,20 @@ const SerialPortInterface = dynamic(
 
 export default function Home() {
   return (
-    <div className="min-h-screen p-4 md:p-8 bg-gray-100 dark:bg-gray-800">
+    <div className="min-h-screen p-4 md:p-8 bg-dark-bg">
       <main className="max-w-6xl mx-auto">
         <div className="text-center mb-12">
-          <h1 className="text-3xl md:text-4xl font-bold mb-2 text-gray-800 dark:text-gray-100">
+          <h1 className="text-3xl md:text-4xl font-bold mb-2 text-neon-blue">
             IC Testing Interface
           </h1>
-          <p className="text-base md:text-lg text-gray-700 dark:text-gray-300">
+          <p className="text-base md:text-lg text-light-text">
             Select an IC, connect your testing device, and control pin states through your browser
           </p>
         </div>
 
         <SerialPortInterface />
 
-        <div className="mt-12 text-center text-sm md:text-base text-gray-600 dark:text-gray-400">
+        <div className="mt-12 text-center text-sm md:text-base text-medium-text">
           <p>
             This interface requires a browser that supports the Web Serial API
             (Chrome, Edge, or Opera).
