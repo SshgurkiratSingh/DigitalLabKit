@@ -975,104 +975,10 @@ export default function SerialPortInterface({
   }
 
   return (
-    <div className="space-y-6">
-      {/* Debug Log - Moved to top */}
-      <div className="p-6 bg-white dark:bg-gray-800 rounded-xl shadow-md border-2 border-blue-500">
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-xl font-bold dark:text-white flex items-center">
-            <span className="mr-2">🔍</span>
-            Debug Log
-          </h2>
-          <div className="flex space-x-2">
-            <button
-              onClick={() => setDebugLogs([])}
-              className="px-3 py-1 text-sm bg-red-100 text-red-800 rounded hover:bg-red-200 dark:bg-red-900 dark:text-red-100 dark:hover:bg-red-800"
-            >
-              Clear Log
-            </button>
-            <button
-              onClick={() => {
-                if (isConnected) {
-                  sendData("SYNC\n");
-                }
-              }}
-              disabled={!isConnected}
-              className="px-3 py-1 text-sm bg-blue-100 text-blue-800 rounded hover:bg-blue-200 dark:bg-blue-900 dark:text-blue-100 dark:hover:bg-blue-800 disabled:opacity-50"
-            >
-              Request Sync
-            </button>
-            <button
-              onClick={() => {
-                setDebugLogs((prev) => [
-                  ...prev,
-                  {
-                    timestamp: new Date().toISOString(),
-                    type: "info",
-                    message: `Current buffer content: "${commandBufferRef.current}"`,
-                  },
-                ]);
-              }}
-              className="px-3 py-1 text-sm bg-yellow-100 text-yellow-800 rounded hover:bg-yellow-200 dark:bg-yellow-900 dark:text-yellow-100 dark:hover:bg-yellow-800"
-            >
-              Show Buffer
-            </button>
-          </div>
-        </div>
-
-        <div className="h-64 overflow-y-auto border rounded dark:border-gray-700 bg-gray-50 dark:bg-gray-900">
-          <div className="sticky top-0 bg-gray-100 dark:bg-gray-800 border-b dark:border-gray-700">
-            <div className="grid grid-cols-12 gap-2 px-4 py-2 text-xs font-medium text-gray-500 dark:text-gray-400">
-              <div className="col-span-2">Time</div>
-              <div className="col-span-2">Type</div>
-              <div className="col-span-8">Message</div>
-            </div>
-          </div>
-
-          <div className="divide-y divide-gray-200 dark:divide-gray-700">
-            {debugLogs
-              .slice()
-              .reverse()
-              .map((log, index) => (
-                <div
-                  key={index}
-                  className="grid grid-cols-12 gap-2 px-4 py-2 text-sm hover:bg-white dark:hover:bg-gray-800"
-                >
-                  <div className="col-span-2 text-gray-500 dark:text-gray-400">
-                    {new Date(log.timestamp).toLocaleTimeString()}
-                  </div>
-                  <div className="col-span-2">
-                    <span
-                      className={`inline-block px-2 py-0.5 text-xs rounded-full ${
-                        log.type === "received"
-                          ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100"
-                          : log.type === "sent"
-                          ? "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-100"
-                          : log.type === "info"
-                          ? "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-100"
-                          : "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-100"
-                      }`}
-                    >
-                      {log.type}
-                    </span>
-                  </div>
-                  <div className="col-span-8 font-mono text-gray-900 dark:text-gray-100 break-all">
-                    {log.message}
-                  </div>
-                </div>
-              ))}
-          </div>
-        </div>
-
-        {debugLogs.length === 0 && (
-          <div className="text-center p-4 text-gray-500 dark:text-gray-400">
-            No debug messages yet
-          </div>
-        )}
-      </div>
-
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
       {/* Serial Port Connection */}
-      <div className="p-6 bg-white dark:bg-gray-800 rounded-xl shadow-md">
-        <h2 className="text-xl font-bold mb-4 dark:text-white">
+      <div className="p-6 bg-white dark:bg-gray-800 rounded-lg shadow-lg">
+        <h2 className="text-xl font-semibold mb-4 dark:text-white">
           Serial Port Connection
         </h2>
 
@@ -1117,14 +1023,14 @@ export default function SerialPortInterface({
           <button
             onClick={requestPort}
             disabled={isConnected}
-            className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:opacity-50"
+            className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 disabled:opacity-50"
           >
             Request Port
           </button>
           <button
             onClick={isConnected ? disconnectFromPort : connectToPort}
             disabled={!selectedPort}
-            className={`px-4 py-2 rounded ${
+            className={`px-4 py-2 rounded-md ${
               isConnected
                 ? "bg-red-500 hover:bg-red-600"
                 : "bg-green-500 hover:bg-green-600"
@@ -1136,15 +1042,15 @@ export default function SerialPortInterface({
 
         {/* Error Messages */}
         {error && (
-          <div className="mt-4 p-2 bg-red-100 text-red-700 rounded">
+          <div className="mt-4 p-2 bg-red-100 text-red-700 rounded-md">
             {error}
           </div>
         )}
       </div>
 
       {/* IC Selection and Visualization */}
-      <div className="p-6 bg-white dark:bg-gray-800 rounded-xl shadow-md">
-        <h2 className="text-xl font-bold mb-4 dark:text-white">
+      <div className="p-6 bg-white dark:bg-gray-800 rounded-lg shadow-lg">
+        <h2 className="text-xl font-semibold mb-4 dark:text-white">
           IC Configuration
         </h2>
         <ICSelector onICSelect={handleICSelect} />
@@ -1169,14 +1075,17 @@ export default function SerialPortInterface({
         )}
       </div>
 
-      {/* Debug Log */}
-      <div className="p-6 bg-white dark:bg-gray-800 rounded-xl shadow-md">
+      {/* Debug Log - Spanning both columns on medium screens and above */}
+      <div className="md:col-span-2 p-6 bg-white dark:bg-gray-800 rounded-lg shadow-lg border-2 border-blue-500">
         <div className="flex justify-between items-center mb-4">
-          <h2 className="text-xl font-bold dark:text-white">Debug Log</h2>
+          <h2 className="text-xl font-semibold dark:text-white flex items-center">
+            <span className="mr-2">🔍</span>
+            Debug Log
+          </h2>
           <div className="flex space-x-2">
             <button
               onClick={() => setDebugLogs([])}
-              className="px-3 py-1 text-sm bg-red-100 text-red-800 rounded hover:bg-red-200 dark:bg-red-900 dark:text-red-100 dark:hover:bg-red-800"
+              className="px-4 py-2 text-sm bg-red-100 text-red-800 rounded-md hover:bg-red-200 dark:bg-red-900 dark:text-red-100 dark:hover:bg-red-800"
             >
               Clear Log
             </button>
@@ -1187,7 +1096,7 @@ export default function SerialPortInterface({
                 }
               }}
               disabled={!isConnected}
-              className="px-3 py-1 text-sm bg-blue-100 text-blue-800 rounded hover:bg-blue-200 dark:bg-blue-900 dark:text-blue-100 dark:hover:bg-blue-800 disabled:opacity-50"
+              className="px-4 py-2 text-sm bg-blue-100 text-blue-800 rounded-md hover:bg-blue-200 dark:bg-blue-900 dark:text-blue-100 dark:hover:bg-blue-800 disabled:opacity-50"
             >
               Request Sync
             </button>
@@ -1202,7 +1111,7 @@ export default function SerialPortInterface({
                   },
                 ]);
               }}
-              className="px-3 py-1 text-sm bg-yellow-100 text-yellow-800 rounded hover:bg-yellow-200 dark:bg-yellow-900 dark:text-yellow-100 dark:hover:bg-yellow-800"
+              className="px-4 py-2 text-sm bg-yellow-100 text-yellow-800 rounded-md hover:bg-yellow-200 dark:bg-yellow-900 dark:text-yellow-100 dark:hover:bg-yellow-800"
             >
               Show Buffer
             </button>
@@ -1210,8 +1119,8 @@ export default function SerialPortInterface({
         </div>
 
         <div className="h-96 overflow-y-auto border rounded dark:border-gray-700 bg-gray-50 dark:bg-gray-900">
-          <div className="sticky top-0 bg-gray-100 dark:bg-gray-800 border-b dark:border-gray-700">
-            <div className="grid grid-cols-12 gap-2 px-4 py-2 text-xs font-medium text-gray-500 dark:text-gray-400">
+          <div className="sticky top-0 bg-slate-100 dark:bg-slate-700 border-b dark:border-gray-700">
+            <div className="grid grid-cols-12 gap-2 px-4 py-2 text-xs font-medium text-gray-500 dark:text-gray-300">
               <div className="col-span-2">Time</div>
               <div className="col-span-2">Type</div>
               <div className="col-span-8">Message</div>
