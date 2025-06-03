@@ -990,7 +990,7 @@ export default function SerialPortInterface({
   }
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+    <div className=" gap-6">
       {/* Serial Port Connection */}
       <div className="p-6 bg-[var(--background)] rounded-lg shadow-lg">
         <h2 className="text-xl font-semibold mb-4 text-[var(--foreground)]">

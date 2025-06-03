@@ -16,7 +16,8 @@ export default function Home() {
             IC Testing Interface
           </h1>
           <p className="text-base md:text-lg text-neutral-300">
-            Select an IC, connect your testing device, and control pin states through your browser
+            Select an IC, connect your testing device, and control pin states
+            through your browser
           </p>
         </div>
 
@@ -27,14 +28,6 @@ export default function Home() {
             This interface requires a browser that supports the Web Serial API
             (Chrome, Edge, or Opera).
           </p>
-          <p className="mt-2">
-            Protocol Specification:
-          </p>
-          <ul className="list-disc list-inside mt-1 space-y-1">
-            <li>IC Selection: Send "IC:&lt;part_number&gt;" (e.g., "IC:7447")</li>
-            <li>Pin States: Send "PINS:&lt;pin_number&gt;:&lt;state&gt;,..." (e.g., "PINS:1:1,2:0")</li>
-            <li>Receive Pin States: "PINS:&lt;16_bit_string&gt;" (e.g., "PINS:0101010101010101")</li>
-          </ul>
         </div>
       </main>
     </div>
