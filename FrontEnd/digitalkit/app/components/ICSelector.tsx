@@ -1,20 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { ICData } from "../types"; // Import ICData
 
-interface ICData {
-  partNumber: string;
-  description: string;
-  category: string;
-  pinCount: number;
-  pinConfiguration: Array<{
-    pin: number;
-    name: string;
-    type: string;
-    function: string;
-  }>;
-}
-
+// Local ICFile interface might still be needed if its structure is specific to this component's fetching logic
 interface ICFile {
   [key: string]: {
     [key: string]: {
@@ -25,122 +14,27 @@ interface ICFile {
 
 export default function ICSelector({
   onICSelect,
+  initialICs // Assuming initialICs is passed from MainInterface and is of type ICData[] from ../types
 }: {
   onICSelect: (ic: ICData | null) => void;
+  initialICs: ICData[]; // Add this prop to receive ICs from parent
 }) {
-  const [allICs, setAllICs] = useState<ICData[]>([]);
+  // const [allICs, setAllICs] = useState<ICData[]>([]); // This state will be replaced by initialICs prop
   const [selectedIC, setSelectedIC] = useState<string>("");
   const [searchTerm, setSearchTerm] = useState<string>("");
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState<string>("");
+  // Loading and error states might still be relevant if filtering/preparing initialICs is complex,
+  // but the primary data loading is now external.
+  // For now, assume initialICs is ready to use.
+  // const [loading, setLoading] = useState(true); // Handled by ICDataManager
+  // const [error, setError] = useState<string | null>(null); // Handled by ICDataManager
 
-  useEffect(() => {
-    const loadICFiles = async () => {
-      const files = [
-        "BCDDecoderIC",
-        "CounterIC",
-        "ShiftRegisterIC",
-        "arithmeticIc",
-        "combinationalIC",
-        "comparatorIc",
-        "sequentialIC",
-      ];
+  // useEffect(() => {
+    // The IC loading logic is removed as ICs are passed via initialICs prop
+    // If initialICs could change, might need an effect to reset selection or filter
+  // }, [initialICs]);
 
-      const ics: ICData[] = [];
-      const errors: string[] = [];
-
-      try {
-        // Load all IC files in parallel with timeout
-        const responses = await Promise.all(
-          files.map(file => 
-            Promise.race([
-              fetch(`/files/${file}.json`),
-              new Promise((_, reject) => 
-                setTimeout(() => reject(new Error('Timeout')), 5000)
-              )
-            ]).then(response => response as Response)
-          )
-        );
-
-        // Process each response
-        for (let i = 0; i < responses.length; i++) {
-          const response = responses[i];
-          const file = files[i];
-
-          if (!response.ok) {
-            errors.push(`Failed to load ${file}.json: ${response.statusText}`);
-            continue;
-          }
-
-          try {
-            const data: ICFile = await response.json();
-            
-            if (!data || typeof data !== 'object') {
-              errors.push(`Invalid data format in ${file}.json`);
-              continue;
-            }
-
-            // Check for 74SeriesICs structure
-            if (!data['74SeriesICs']) {
-              errors.push(`Missing 74SeriesICs data in ${file}.json`);
-              continue;
-            }
-            
-            // Flatten the nested structure and extract all ICs
-            const extractICs = (obj: any) => {
-              if (obj && typeof obj === 'object') {
-                if ('partNumber' in obj) {
-                  // Only add ICs with valid pin counts (14-16)
-                  if (obj.pinCount >= 14 && obj.pinCount <= 16) {
-                    // Add category information to the IC object but don't show it in UI
-                    const icWithCategory = {
-                      ...obj,
-                      category: file.replace(/IC$|Ic$/, '')
-                    };
-                    // Check if this IC is not already in the list (avoid duplicates)
-                    if (!ics.some(existingIC => existingIC.partNumber === obj.partNumber)) {
-                      ics.push(icWithCategory);
-                    }
-                  }
-                } else {
-                  Object.values(obj).forEach(value => extractICs(value));
-                }
-              }
-            };
-            
-            extractICs(data);
-          } catch (error) {
-            errors.push(`Error parsing ${file}.json: ${error}`);
-          }
-        }
-      } catch (err) {
-        const error = err as Error;
-        if (error.message === 'Timeout') {
-          errors.push('Timeout while loading IC files. Please try again.');
-        } else {
-          errors.push(`Error loading IC files: ${error}`);
-        }
-      }
-
-      if (errors.length > 0) {
-        setError(errors.join('\n'));
-      }
-
-      // Sort ICs numerically by part number
-      ics.sort((a, b) => {
-        const aNum = parseInt(a.partNumber.match(/\d+/)?.[0] || '0');
-        const bNum = parseInt(b.partNumber.match(/\d+/)?.[0] || '0');
-        return aNum - bNum || a.partNumber.localeCompare(b.partNumber);
-      });
-      
-      setAllICs(ics);
-      setLoading(false);
-    };
-
-    loadICFiles();
-  }, []);
-
-  const filteredICs = allICs.filter(ic => 
+  const filteredICs = initialICs.filter(ic =>
     ic.partNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
     ic.description.toLowerCase().includes(searchTerm.toLowerCase())
   );

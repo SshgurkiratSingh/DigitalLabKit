@@ -1,27 +1,14 @@
 "use client";
 
 import { useState, useEffect } from "react";
-
-interface Pin {
-  pin: number;
-  name: string;
-  type: string;
-  function: string;
-}
-
-interface ICData {
-  partNumber: string;
-  description: string;
-  category: string;
-  pinCount: number;
-  pinConfiguration: Pin[];
-}
+import { ICData } from "../types"; // Import ICData
+// The Pin type is part of ICData from types.ts, so local Pin can be removed.
 
 interface ICVisualizerProps {
-  ic: ICData | null;
+  ic: ICData | null; // Now uses ICData from types.ts
   onPinStateChange?: (pinStates: { [key: number]: boolean }) => void;
   serialConnected: boolean;
-  currentPinStates?: { [key: number]: boolean }; // Add this prop
+  currentPinStates?: { [key: number]: boolean };
 }
 
 export default function ICVisualizer({
@@ -30,7 +17,6 @@ export default function ICVisualizer({
   serialConnected,
   currentPinStates = {},
 }: ICVisualizerProps) {
-  // Add local state to track pin states
   const [localPinStates, setLocalPinStates] = useState<{ [key: number]: boolean }>({});
 
   // Update local pin states when IC changes or when currentPinStates changes

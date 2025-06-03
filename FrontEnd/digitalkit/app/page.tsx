@@ -1,9 +1,9 @@
 "use client";
 import dynamic from "next/dynamic";
 
-// Dynamically import the SerialPortInterface component with no SSR
-const SerialPortInterface = dynamic(
-  () => import("./components/SerialPortInterface"),
+// Dynamically import the MainInterface component with no SSR
+const MainInterface = dynamic(
+  () => import("./components/MainInterface"), // Updated path
   { ssr: false }
 );
 
@@ -21,7 +21,7 @@ export default function Home() {
           </p>
         </div>
 
-        <SerialPortInterface />
+        <MainInterface />
 
         <div className="mt-12 text-center text-sm md:text-base text-neutral-400">
           <p>
