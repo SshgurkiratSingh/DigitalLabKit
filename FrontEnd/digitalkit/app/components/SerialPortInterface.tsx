@@ -826,7 +826,7 @@ export default function SerialPortInterface({
     }
 
     // Send the binary pin states directly to the device
-    sendData(`${pinStateStr}\n`);
+    sendData(`PINS:${pinStateStr}\n`);
 
     // Update local pin states
     setPinStates((prev) => ({
@@ -850,13 +850,13 @@ export default function SerialPortInterface({
     const loadICData = async () => {
       try {
         const icFiles = [
-          'BCDDecoderIC.json',
-          'CounterIC.json',
-          'ShiftRegisterIC.json',
-          'arithmeticIc.json',
-          'combinationalIC.json',
-          'comparatorIc.json',
-          'sequentialIC.json'
+          "BCDDecoderIC.json",
+          "CounterIC.json",
+          "ShiftRegisterIC.json",
+          "arithmeticIc.json",
+          "combinationalIC.json",
+          "comparatorIc.json",
+          "sequentialIC.json",
         ];
 
         const allICData: ICData[] = [];
@@ -867,44 +867,53 @@ export default function SerialPortInterface({
             throw new Error(`Failed to load ${file}: ${response.statusText}`);
           }
           const data = await response.json();
-          if (!data || typeof data !== 'object') {
+          if (!data || typeof data !== "object") {
             throw new Error(`Invalid data format in ${file}`);
           }
 
           // Extract ICs from nested structure with improved type checking
           Object.values(data).forEach((series: any) => {
-            if (!series || typeof series !== 'object') {
-              console.warn('Invalid series data found, skipping...');
+            if (!series || typeof series !== "object") {
+              console.warn("Invalid series data found, skipping...");
               return;
             }
             Object.values(series).forEach((category: any) => {
-              if (!category || typeof category !== 'object') {
-                console.warn('Invalid category data found, skipping...');
+              if (!category || typeof category !== "object") {
+                console.warn("Invalid category data found, skipping...");
                 return;
               }
               Object.values(category).forEach((ic: any) => {
-                if (!ic || typeof ic !== 'object') {
-                  console.warn('Invalid IC data found, skipping...');
+                if (!ic || typeof ic !== "object") {
+                  console.warn("Invalid IC data found, skipping...");
                   return;
                 }
                 // Validate required IC properties
                 if (
-                  ic.partNumber && typeof ic.partNumber === 'string' &&
-                  ic.description && typeof ic.description === 'string' &&
-                  ic.category && typeof ic.category === 'string' &&
-                  ic.pinCount && typeof ic.pinCount === 'number' &&
+                  ic.partNumber &&
+                  typeof ic.partNumber === "string" &&
+                  ic.description &&
+                  typeof ic.description === "string" &&
+                  ic.category &&
+                  typeof ic.category === "string" &&
+                  ic.pinCount &&
+                  typeof ic.pinCount === "number" &&
                   Array.isArray(ic.pinConfiguration) &&
-                  ic.pinConfiguration.every((pin: any) =>
-                    pin &&
-                    typeof pin.pin === 'number' &&
-                    typeof pin.name === 'string' &&
-                    typeof pin.type === 'string' &&
-                    typeof pin.function === 'string'
+                  ic.pinConfiguration.every(
+                    (pin: any) =>
+                      pin &&
+                      typeof pin.pin === "number" &&
+                      typeof pin.name === "string" &&
+                      typeof pin.type === "string" &&
+                      typeof pin.function === "string"
                   )
                 ) {
                   allICData.push(ic as ICData);
                 } else {
-                  console.warn(`Skipping IC with invalid or missing properties: ${ic.partNumber || 'unknown'}`);
+                  console.warn(
+                    `Skipping IC with invalid or missing properties: ${
+                      ic.partNumber || "unknown"
+                    }`
+                  );
                 }
               });
             });
@@ -917,12 +926,17 @@ export default function SerialPortInterface({
           {
             timestamp: new Date().toISOString(),
             type: "info",
-            message: `Successfully loaded ${allICData.length} ICs from ${icFiles.length} files. IC types: ${Array.from(new Set(allICData.map(ic => ic.category))).join(', ')}`,
+            message: `Successfully loaded ${allICData.length} ICs from ${
+              icFiles.length
+            } files. IC types: ${Array.from(
+              new Set(allICData.map((ic) => ic.category))
+            ).join(", ")}`,
           },
         ]);
       } catch (error) {
-        console.error('Error loading IC data:', error);
-        const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+        console.error("Error loading IC data:", error);
+        const errorMessage =
+          error instanceof Error ? error.message : "Unknown error occurred";
         setDebugLogs((prev) => [
           ...prev,
           {
