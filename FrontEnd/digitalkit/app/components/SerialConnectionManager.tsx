@@ -102,7 +102,7 @@ const SerialConnectionManager = React.forwardRef<SerialConnectionManagerHandle, 
           const icNumber = command.substring(3).trim();
           onDataReceived("ic_command_received", {
             icNumber,
-            allICs: allICsForDetection, // Pass allICs here
+            allICs: allICsForDetection // Pass allICs here (trailing comma removed)
           });
           return;
         }
@@ -134,7 +134,7 @@ const SerialConnectionManager = React.forwardRef<SerialConnectionManagerHandle, 
           } else {
             addLog("error", `Invalid pin data format: ${pinData}`);
             onDataReceived("error", {
-              message: `Invalid pin data format: ${pinData}`,
+              message: `Invalid pin data format: ${pinData}` // Trailing comma removed
             });
           }
           return;
@@ -162,7 +162,7 @@ const SerialConnectionManager = React.forwardRef<SerialConnectionManagerHandle, 
             : String(processingError);
         addLog("error", `Error processing message: ${errorMessage}`);
         onDataReceived("error", {
-          message: `Error processing command "${command}": ${errorMessage}`,
+          message: `Error processing command "${command}": ${errorMessage}` // Trailing comma removed
         });
       }
     },
