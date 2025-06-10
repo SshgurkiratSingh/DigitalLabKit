@@ -2,6 +2,8 @@
     "74SeriesICs": {
         "BCD_DECODERS": {
             "7447": {
+                "DS": "7447.pdf",
+                "ic_img": "7447.jpg",
                 "partNumber": "7447",
                 "description": "BCD to 7-Segment Decoder/Driver (Common Anode)",
                 "category": "BCD_DECODER",
@@ -213,6 +215,8 @@
                 }
             },
             "7448": {
+                "DS": "7448.PDF",
+                "ic_img": "7448.jpg",
                 "partNumber": "7448",
                 "description": "BCD to 7-Segment Decoder/Driver (Common Cathode)",
                 "category": "BCD_DECODER",
