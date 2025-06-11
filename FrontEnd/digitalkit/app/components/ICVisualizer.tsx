@@ -100,6 +100,47 @@ function ImageModal({
   );
 }
 
+// Modal component for PDF display
+function PdfModal({
+  pdfPath,
+  onClose,
+}: {
+  pdfPath: string;
+  onClose: () => void;
+}) {
+  return (
+    <div
+      className="fixed inset-0 z-60 flex items-center justify-center bg-black bg-opacity-80" // Higher z-index than ImageModal
+      onClick={onClose}
+      tabIndex={-1}
+      aria-modal="true"
+      role="dialog"
+    >
+      <div
+        className="bg-white p-2 rounded-lg shadow-lg" // Added padding and rounded corners for the iframe container
+        style={{ width: "90vw", height: "90vh" }}
+        onClick={e => e.stopPropagation()} // Prevent modal close when clicking inside PDF content
+      >
+        <iframe
+          src={pdfPath}
+          width="100%"
+          height="100%"
+          title="PDF Viewer"
+          style={{ border: "none" }} // Remove default iframe border
+        />
+      </div>
+      <button
+        className="absolute top-4 right-6 text-white text-3xl font-bold" // Style similar to ImageModal close button
+        onClick={onClose}
+        aria-label="Close PDF viewer"
+        tabIndex={0}
+      >
+        &times;
+      </button>
+    </div>
+  );
+}
+
 export default function ICVisualizer({
   ic,
   onPinStateChange,
@@ -108,6 +149,8 @@ export default function ICVisualizer({
 }: ICVisualizerProps) {
   const [localPinStates, setLocalPinStates] = useState<{ [key: number]: boolean }>({});
   const [modalImgSrc, setModalImgSrc] = useState<string | null>(null);
+  const [showPdfModal, setShowPdfModal] = useState<boolean>(false);
+  const [currentPdfPath, setCurrentPdfPath] = useState<string | null>(null);
 
   useEffect(() => {
     if (ic) {
@@ -181,7 +224,8 @@ export default function ICVisualizer({
     try {
       const res = await fetch(url, { method: "HEAD" });
       if (res.ok) {
-        window.open(url, "_blank", "noopener,noreferrer");
+        setCurrentPdfPath(url);
+        setShowPdfModal(true);
         return;
       }
     } catch {}
@@ -189,7 +233,8 @@ export default function ICVisualizer({
     try {
       const res = await fetch(url, { method: "HEAD" });
       if (res.ok) {
-        window.open(url, "_blank", "noopener,noreferrer");
+        setCurrentPdfPath(url);
+        setShowPdfModal(true);
         return;
       }
     } catch {}
@@ -302,6 +347,17 @@ export default function ICVisualizer({
           src={modalImgSrc}
           alt={`${ic.partNumber} IC enlarged`}
           onClose={handleModalClose}
+        />
+      )}
+
+      {/* Modal for PDF display */}
+      {showPdfModal && currentPdfPath && (
+        <PdfModal
+          pdfPath={currentPdfPath}
+          onClose={() => {
+            setShowPdfModal(false);
+            setCurrentPdfPath(null);
+          }}
         />
       )}
     </div>
