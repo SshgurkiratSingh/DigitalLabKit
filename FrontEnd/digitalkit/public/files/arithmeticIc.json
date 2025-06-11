@@ -2,6 +2,8 @@
     "74SeriesICs": {
       "ARITHMETIC": {
         "74LS83": {
+            "DS": "74ls83.PDF",
+                "ic_img": "74LS83.png",
           "partNumber": "74LS83",
           "description": "4-bit Binary Full Adder with Fast Carry",
           "category": "ADDER",

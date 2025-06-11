@@ -2,6 +2,8 @@
   "74SeriesICs": {
     "COUNTERS": {
       "74LS191": {
+        "DS": "74ls191.PDF",
+                "ic_img": "74LS191.jpg",
         "partNumber": "74LS191",
         "description": "4-bit Synchronous Up/Down Binary Counter",
         "category": "COUNTER",
@@ -292,6 +294,8 @@
         }
       },
       "74LS90": {
+        "DS": "74ls90.PDF",
+                "ic_img": "74LS90.jpg",
         "partNumber": "74LS90",
         "description": "Asynchronous Decade Counter",
         "category": "COUNTER",

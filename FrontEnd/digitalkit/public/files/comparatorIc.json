@@ -2,6 +2,8 @@
     "74SeriesICs": {
         "COMPARATORS": {
             "74LS85": {
+                  "DS": "74ls85.PDF",
+                "ic_img": "74LS85.jpg",
                 "partNumber": "74LS85",
                 "description": "4-bit Magnitude Comparator",
                 "category": "COMPARATOR",

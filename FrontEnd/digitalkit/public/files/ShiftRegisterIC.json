@@ -2,6 +2,8 @@
     "74SeriesICs": {
         "SHIFT_REGISTERS": {
             "74HC194": {
+                "DS": "74hc194.pdf",
+                "ic_img": "74HC194.png",
                 "partNumber": "74HC194",
                 "description": "4-bit Bidirectional Universal Shift Register",
                 "category": "SHIFT_REGISTER",
@@ -164,6 +166,8 @@
                 }
             },
             "74HC595": {
+                  "DS": "74hc595.pdf",
+                "ic_img": "74HC595.png",
                 "partNumber": "74HC595",
                 "description": "8-bit Serial-in, Parallel-out Shift Register",
                 "category": "SHIFT_REGISTER",

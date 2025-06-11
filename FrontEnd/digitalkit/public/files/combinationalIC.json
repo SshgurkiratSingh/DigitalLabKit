@@ -2,6 +2,8 @@
     "74SeriesICs": {
         "LOGIC_GATES": {
             "7400": {
+                 "DS": "7400.PDF",
+                "ic_img": "7400.jpg",
                 "partNumber": "7400",
                 "description": "Quad 2-Input NAND Gate",
                 "category": "LOGIC_GATE",
@@ -129,6 +131,8 @@
                 }
             },
             "7408": {
+                 "DS": "7408.PDF",
+                "ic_img": "7408.png",
                 "partNumber": "7408",
                 "description": "Quad 2-Input AND Gate",
                 "category": "LOGIC_GATE",
@@ -256,6 +260,8 @@
                 }
             },
             "7432": {
+                 "DS": "7432.PDF",
+                "ic_img": "7432.png",
                 "partNumber": "7432",
                 "description": "Quad 2-Input OR Gate",
                 "category": "LOGIC_GATE",
@@ -383,6 +389,8 @@
                 }
             },
             "7402": {
+                 "DS": "7402.PDF",
+                "ic_img": "7402.png",
                 "partNumber": "7402",
                 "description": "Quad 2-Input NOR Gate",
                 "category": "LOGIC_GATE",
@@ -510,6 +518,8 @@
                 }
             },
             "7486": {
+                 "DS": "7486.PDF",
+                "ic_img": "7486.jpg",
                 "partNumber": "7486",
                 "description": "Quad 2-Input XOR Gate",
                 "category": "LOGIC_GATE",
@@ -637,6 +647,8 @@
                 }
             },
             "7404": {
+                "DS": "7404.pdf",
+                "ic_img": "7404.png",
                 "partNumber": "7404",
                 "description": "Hex Inverter",
                 "category": "LOGIC_GATE",
@@ -757,6 +769,8 @@
         },
         "MULTIPLEXERS": {
             "74157": {
+                "DS": "74157.PDF",
+                "ic_img": "74157.jpg",
                 "partNumber": "74157",
                 "description": "Quad 2-to-1 Line Data Selector/Multiplexer",
                 "category": "MULTIPLEXER",
@@ -904,6 +918,8 @@
         },
         "DEMULTIPLEXERS": {
             "74139": {
+                "DS": "74139.PDF",
+                "ic_img": "74139.png",
                 "partNumber": "74139",
                 "description": "Dual 2-to-4 Line Decoder/Demultiplexer",
                 "category": "DEMULTIPLEXER",
@@ -1061,6 +1077,8 @@
             }
         },
         "74LS138": {
+             "DS": "74138.PDF",
+                "ic_img": "74138.png",
             "partNumber": "74LS138",
             "description": "3-to-8 Line Decoder/Demultiplexer with Active-Low Outputs",
             "category": "DECODER",

@@ -2,6 +2,8 @@
     "74SeriesICs": {
         "FLIP_FLOPS": {
             "7473": {
+                "DS": "7473.PDF",
+                "ic_img": "7473.jpg",
                 "partNumber": "7473",
                 "description": "Dual JK Flip-Flop with Clear",
                 "category": "FLIP_FLOP",
@@ -159,6 +161,8 @@
         },
         "LATCHES": {
             "7475": {
+                "DS": "7475.pdf",
+                "ic_img": "7475.jpg",
                 "partNumber": "7475",
                 "description": "4-bit Bistable Latch",
                 "category": "LATCH",
