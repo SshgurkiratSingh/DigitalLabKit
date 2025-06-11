@@ -29,7 +29,7 @@ export default function ICSelector({
   onICSelect: (ic: ICData | null) => void;
 }) {
   const [allICs, setAllICs] = useState<ICData[]>([]);
-  const [selectedIC, setSelectedIC] = useState<string>("");
+  const [selectedIC, setSelectedIC] = useState<ICData | null>(null);
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -50,19 +50,17 @@ export default function ICSelector({
       const errors: string[] = [];
 
       try {
-        // Load all IC files in parallel with timeout
         const responses = await Promise.all(
-          files.map(file => 
+          files.map(file =>
             Promise.race([
               fetch(`/files/${file}.json`),
-              new Promise((_, reject) => 
-                setTimeout(() => reject(new Error('Timeout')), 5000)
+              new Promise((_, reject) =>
+                setTimeout(() => reject(new Error("Timeout")), 5000)
               )
             ]).then(response => response as Response)
           )
         );
 
-        // Process each response
         for (let i = 0; i < responses.length; i++) {
           const response = responses[i];
           const file = files[i];
@@ -74,31 +72,31 @@ export default function ICSelector({
 
           try {
             const data: ICFile = await response.json();
-            
-            if (!data || typeof data !== 'object') {
+
+            if (!data || typeof data !== "object") {
               errors.push(`Invalid data format in ${file}.json`);
               continue;
             }
 
-            // Check for 74SeriesICs structure
-            if (!data['74SeriesICs']) {
+            if (!data["74SeriesICs"]) {
               errors.push(`Missing 74SeriesICs data in ${file}.json`);
               continue;
             }
-            
-            // Flatten the nested structure and extract all ICs
+
             const extractICs = (obj: any) => {
-              if (obj && typeof obj === 'object') {
-                if ('partNumber' in obj) {
-                  // Only add ICs with valid pin counts (14-16)
+              if (obj && typeof obj === "object") {
+                if ("partNumber" in obj) {
                   if (obj.pinCount >= 14 && obj.pinCount <= 16) {
-                    // Add category information to the IC object but don't show it in UI
                     const icWithCategory = {
                       ...obj,
-                      category: file.replace(/IC$|Ic$/, '')
+                      category: file.replace(/IC$|Ic$/, ""),
                     };
-                    // Check if this IC is not already in the list (avoid duplicates)
-                    if (!ics.some(existingIC => existingIC.partNumber === obj.partNumber)) {
+                    if (
+                      !ics.some(
+                        existingIC =>
+                          existingIC.partNumber === obj.partNumber
+                      )
+                    ) {
                       ics.push(icWithCategory);
                     }
                   }
@@ -107,7 +105,7 @@ export default function ICSelector({
                 }
               }
             };
-            
+
             extractICs(data);
           } catch (error) {
             errors.push(`Error parsing ${file}.json: ${error}`);
@@ -115,24 +113,23 @@ export default function ICSelector({
         }
       } catch (err) {
         const error = err as Error;
-        if (error.message === 'Timeout') {
-          errors.push('Timeout while loading IC files. Please try again.');
+        if (error.message === "Timeout") {
+          errors.push("Timeout while loading IC files. Please try again.");
         } else {
           errors.push(`Error loading IC files: ${error}`);
         }
       }
 
       if (errors.length > 0) {
-        setError(errors.join('\n'));
+        setError(errors.join("\n"));
       }
 
-      // Sort ICs numerically by part number
       ics.sort((a, b) => {
-        const aNum = parseInt(a.partNumber.match(/\d+/)?.[0] || '0');
-        const bNum = parseInt(b.partNumber.match(/\d+/)?.[0] || '0');
+        const aNum = parseInt(a.partNumber.match(/\d+/)?.[0] || "0");
+        const bNum = parseInt(b.partNumber.match(/\d+/)?.[0] || "0");
         return aNum - bNum || a.partNumber.localeCompare(b.partNumber);
       });
-      
+
       setAllICs(ics);
       setLoading(false);
     };
@@ -140,7 +137,7 @@ export default function ICSelector({
     loadICFiles();
   }, []);
 
-  const filteredICs = allICs.filter(ic => 
+  const filteredICs = allICs.filter(ic =>
     ic.partNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
     ic.description.toLowerCase().includes(searchTerm.toLowerCase())
   );
@@ -178,11 +175,11 @@ export default function ICSelector({
               <button
                 key={ic.partNumber}
                 onClick={() => {
-                  setSelectedIC(ic.partNumber);
+                  setSelectedIC(ic);
                   onICSelect(ic);
                 }}
                 className={`p-2 text-sm text-left border rounded transition-colors flex flex-col
-                  ${selectedIC === ic.partNumber
+                  ${selectedIC?.partNumber === ic.partNumber
                     ? 'bg-blue-100 border-blue-500 dark:bg-blue-900 dark:border-blue-400'
                     : 'hover:bg-gray-100 dark:hover:bg-gray-800 border-gray-200 dark:border-gray-700'}
                   dark:text-white`}
@@ -209,6 +206,8 @@ export default function ICSelector({
           )}
         </div>
       )}
+
+     
     </div>
   );
 }
