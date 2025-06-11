@@ -100,6 +100,47 @@ function ImageModal({
   );
 }
 
+// Modal component for PDF display
+function PdfModal({
+  pdfPath,
+  onClose,
+}: {
+  pdfPath: string;
+  onClose: () => void;
+}) {
+  return (
+    <div
+      className="fixed inset-0 z-60 flex items-center justify-center bg-black bg-opacity-80" // Higher z-index than ImageModal
+      onClick={onClose}
+      tabIndex={-1}
+      aria-modal="true"
+      role="dialog"
+    >
+      <div
+        className="bg-white p-2 rounded-lg shadow-lg" // Added padding and rounded corners for the iframe container
+        style={{ width: "90vw", height: "90vh" }}
+        onClick={e => e.stopPropagation()} // Prevent modal close when clicking inside PDF content
+      >
+        <iframe
+          src={pdfPath}
+          width="100%"
+          height="100%"
+          title="PDF Viewer"
+          style={{ border: "none" }} // Remove default iframe border
+        />
+      </div>
+      <button
+        className="absolute top-4 right-6 text-white text-3xl font-bold" // Style similar to ImageModal close button
+        onClick={onClose}
+        aria-label="Close PDF viewer"
+        tabIndex={0}
+      >
+        &times;
+      </button>
+    </div>
+  );
+}
+
 export default function ICVisualizer({
   ic,
   onPinStateChange,
@@ -108,6 +149,9 @@ export default function ICVisualizer({
 }: ICVisualizerProps) {
   const [localPinStates, setLocalPinStates] = useState<{ [key: number]: boolean }>({});
   const [modalImgSrc, setModalImgSrc] = useState<string | null>(null);
+  const [showPdfModal, setShowPdfModal] = useState<boolean>(false);
+  const [currentPdfPath, setCurrentPdfPath] = useState<string | null>(null);
+  const [isFullScreenView, setIsFullScreenView] = useState<boolean>(false);
 
   useEffect(() => {
     if (ic) {
@@ -119,6 +163,23 @@ export default function ICVisualizer({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ic, currentPinStates]);
+
+  // Effect for handling Escape key in full-screen mode
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setIsFullScreenView(false);
+      }
+    };
+
+    if (isFullScreenView) {
+      window.addEventListener('keydown', handleKeyDown);
+    }
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isFullScreenView]);
 
   if (!ic) return null;
 
@@ -181,7 +242,8 @@ export default function ICVisualizer({
     try {
       const res = await fetch(url, { method: "HEAD" });
       if (res.ok) {
-        window.open(url, "_blank", "noopener,noreferrer");
+        setCurrentPdfPath(url);
+        setShowPdfModal(true);
         return;
       }
     } catch {}
@@ -189,18 +251,97 @@ export default function ICVisualizer({
     try {
       const res = await fetch(url, { method: "HEAD" });
       if (res.ok) {
-        window.open(url, "_blank", "noopener,noreferrer");
+        setCurrentPdfPath(url);
+        setShowPdfModal(true);
         return;
       }
     } catch {}
     alert("Datasheet not found for this IC.");
   };
 
+  if (isFullScreenView) {
+    return (
+      <div
+        className="fixed top-0 left-0 right-0 bottom-0 w-screen h-screen bg-slate-900 z-50 flex flex-col items-center justify-center p-4 md:p-8"
+      >
+        <button
+          onClick={() => setIsFullScreenView(!isFullScreenView)}
+          className="absolute top-5 right-5 px-4 py-2 bg-red-600 text-white font-bold rounded hover:bg-red-700 z-60 text-sm md:text-base"
+        >
+          Exit Full Screen
+        </button>
+        <div className="flex justify-around items-center w-full max-w-5xl max-h-[90vh]"> {/* Increased max-width, added max-height */}
+          {/* Left Pins */}
+          <div className="space-y-1.5 md:space-y-2"> {/* Adjusted spacing */}
+            {leftPins.map(pin => (
+              <div
+                key={pin.pin}
+                className="flex items-center space-x-2 md:space-x-3 cursor-pointer" // Adjusted spacing
+                onClick={() => togglePin(pin.pin, pin.type)}
+              >
+                <div
+                  className={`w-6 h-6 md:w-7 md:h-7 rounded-full ${getPinColor(pin.type, pin.pin)} ${ // Slightly larger pins
+                    pin.type === "INPUT" && serialConnected
+                      ? "cursor-pointer hover:opacity-80"
+                      : ""
+                  }`}
+                >
+                  <span className="flex items-center justify-center text-white text-xs md:text-sm"> {/* Adjusted text size */}
+                    {pin.pin}
+                  </span>
+                </div>
+                <span className="text-xs md:text-sm text-slate-200">{pin.name} ({pin.type})</span> {/* Adjusted text color for slate bg */}
+              </div>
+            ))}
+          </div>
+
+          {/* IC Image in Center - larger */}
+          <div className="mx-4 flex items-center justify-center h-auto max-h-[400px] md:max-h-[500px] my-4">
+            <ICImage partNumber={ic.partNumber} /> {/* onClick for modal removed here */}
+          </div>
+
+          {/* Right Pins */}
+          <div className="space-y-1.5 md:space-y-2">
+            {rightPins.map(pin => (
+              <div
+                key={pin.pin}
+                className="flex items-center space-x-2 md:space-x-3 cursor-pointer"
+                onClick={() => togglePin(pin.pin, pin.type)}
+              >
+                <span className="text-xs md:text-sm text-right text-slate-200">{pin.name} ({pin.type})</span>
+                <div
+                  className={`w-6 h-6 md:w-7 md:h-7 rounded-full ${getPinColor(pin.type, pin.pin)} ${
+                    pin.type === "INPUT" && serialConnected
+                      ? "cursor-pointer hover:opacity-80"
+                      : ""
+                  }`}
+                >
+                  <span className="flex items-center justify-center text-white text-xs md:text-sm">
+                    {pin.pin}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Default view
   return (
     <div className="p-4 bg-[var(--background)] rounded-lg shadow w-full">
-      <h3 className="text-lg font-semibold mb-4 text-[var(--foreground)]">
-        {ic.partNumber} - {ic.description}
-      </h3>
+      <div className="flex justify-between items-center mb-4">
+        <h3 className="text-lg font-semibold text-[var(--foreground)]">
+          {ic.partNumber} - {ic.description}
+        </h3>
+        <button
+          onClick={() => setIsFullScreenView(!isFullScreenView)}
+          className="px-2 py-1 bg-gray-600 text-white text-xs rounded hover:bg-gray-700 ml-2"
+        >
+          Toggle Full Screen
+        </button>
+      </div>
 
       <div className="flex justify-between items-center">
         {/* Left Pins */}
@@ -302,6 +443,17 @@ export default function ICVisualizer({
           src={modalImgSrc}
           alt={`${ic.partNumber} IC enlarged`}
           onClose={handleModalClose}
+        />
+      )}
+
+      {/* Modal for PDF display */}
+      {showPdfModal && currentPdfPath && (
+        <PdfModal
+          pdfPath={currentPdfPath}
+          onClose={() => {
+            setShowPdfModal(false);
+            setCurrentPdfPath(null);
+          }}
         />
       )}
     </div>
