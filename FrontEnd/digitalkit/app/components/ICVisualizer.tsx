@@ -117,7 +117,7 @@ function PdfModal({
       role="dialog"
     >
       <div
-        className="bg-white p-2 rounded-lg shadow-lg" // Added padding and rounded corners for the iframe container
+        className="bg-black p-2 rounded-lg shadow-lg" // Added padding and rounded corners for the iframe container
         style={{ width: "90vw", height: "90vh" }}
         onClick={e => e.stopPropagation()} // Prevent modal close when clicking inside PDF content
       >
@@ -262,7 +262,7 @@ export default function ICVisualizer({
   if (isFullScreenView) {
     return (
       <div
-        className="fixed top-0 left-0 right-0 bottom-0 w-screen h-screen bg-slate-900 z-50 flex flex-col items-center justify-center p-4 md:p-8"
+className="fixed top-0 left-0 right-0 bottom-0 w-screen h-screen bg-black z-50 flex flex-col items-center justify-center p-4 md:p-8"
       >
         <button
           onClick={() => setIsFullScreenView(!isFullScreenView)}
