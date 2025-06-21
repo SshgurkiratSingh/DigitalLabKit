@@ -447,6 +447,7 @@ export default function SerialPortInterface({
             },
           ]);
       }
+    })(); // Invoke the IIFE
     }
 
     setDebugLogs((prev) => [
