@@ -14,6 +14,81 @@ interface SerialPort {
   writable: WritableStream<Uint8Array> | null;
 }
 
+// Define Web Bluetooth API types
+interface BluetoothDevice {
+  id: string;
+  name?: string;
+  gatt?: BluetoothRemoteGATTServer;
+  addEventListener(
+    type: "gattserverdisconnected",
+    listener: (event: Event) => void
+  ): void;
+  removeEventListener(
+    type: "gattserverdisconnected",
+    listener: (event: Event) => void
+  ): void;
+}
+
+interface BluetoothRemoteGATTServer {
+  connect(): Promise<BluetoothRemoteGATTServer>;
+  disconnect(): void;
+  getPrimaryService(service: string | number): Promise<BluetoothRemoteGATTService>;
+}
+
+interface BluetoothRemoteGATTService {
+  getCharacteristic(
+    characteristic: string | number
+  ): Promise<BluetoothRemoteGATTCharacteristic>;
+}
+
+interface BluetoothRemoteGATTCharacteristic {
+  readValue(): Promise<DataView>;
+  writeValue(value: BufferSource): Promise<void>;
+  startNotifications(): Promise<BluetoothRemoteGATTCharacteristic>;
+  stopNotifications(): Promise<BluetoothRemoteGATTCharacteristic>;
+  addEventListener(
+    type: "characteristicvaluechanged",
+    listener: (event: Event) => void
+  ): void;
+  removeEventListener(
+    type: "characteristicvaluechanged",
+    listener: (event: Event) => void
+  ): void;
+  properties: BluetoothCharacteristicProperties;
+}
+
+interface BluetoothCharacteristicProperties {
+  read: boolean;
+  write: boolean;
+  notify: boolean;
+  // Add other properties as needed
+}
+
+interface Bluetooth extends EventTarget {
+  requestDevice(
+    options?: RequestDeviceOptions
+  ): Promise<BluetoothDevice>;
+  getAvailability(): Promise<boolean>;
+  addEventListener(
+    type: "availabilitychanged",
+    listener: (event: Event) => void
+  ): void;
+  removeEventListener(
+    type: "availabilitychanged",
+    listener: (event: Event) => void
+  ): void;
+}
+
+interface RequestDeviceOptions {
+  filters?: Array<{
+    services?: Array<string | number>;
+    name?: string;
+    namePrefix?: string;
+  }>;
+  optionalServices?: Array<string | number>;
+  acceptAllDevices?: boolean;
+}
+
 interface SerialPortInfo {
   usbVendorId?: number;
   usbProductId?: number;
@@ -43,6 +118,7 @@ interface SerialPortRequestOptions {
 declare global {
   interface Navigator {
     serial: Serial;
+    bluetooth: Bluetooth; // Add bluetooth to Navigator
   }
 }
 
@@ -73,8 +149,14 @@ export default function SerialPortInterface({
 }: SerialPortInterfaceProps = {}) {
   const [ports, setPorts] = useState<SerialPortInfoWrapper[]>([]);
   const [selectedPort, setSelectedPort] = useState<SerialPort | null>(null);
+  const [selectedBluetoothDevice, setSelectedBluetoothDevice] =
+    useState<BluetoothDevice | null>(null); // Added
+  const [bluetoothCharacteristic, setBluetoothCharacteristic] =
+    useState<BluetoothRemoteGATTCharacteristic | null>(null); // Added
   const [isConnected, setIsConnected] = useState(false);
+  const [isBluetoothConnected, setIsBluetoothConnected] = useState(false); // Added
   const [error, setError] = useState<string | null>(null);
+  const [bluetoothError, setBluetoothError] = useState<string | null>(null); // Added
   const [selectedIC, setSelectedIC] = useState<ICData | null>(null);
   const [pinStates, setPinStates] = useState<{ [key: number]: boolean }>({});
   const [debugLogs, setDebugLogs] = useState<
@@ -87,6 +169,9 @@ export default function SerialPortInterface({
   const [allICs, setAllICs] = useState<ICData[]>([]);
   const [showDebugLog, setShowDebugLog] = useState(true);
   const [syncInterval, setSyncInterval] = useState<NodeJS.Timeout | null>(null);
+  const [connectionType, setConnectionType] = useState<"serial" | "bluetooth">(
+    "serial"
+  ); // Added
   const writerRef = useRef<WritableStreamDefaultWriter<Uint8Array> | null>(
     null
   );
@@ -101,8 +186,281 @@ export default function SerialPortInterface({
 
   // Check if Web Serial API is supported
   const isSerialSupported = "serial" in navigator;
+  // Check if Web Bluetooth API is supported
+  const isBluetoothSupported = "bluetooth" in navigator;
 
-  // Request and list available ports
+  // Request Bluetooth device
+  const requestBluetoothDevice = async () => {
+    if (!isBluetoothSupported) {
+      setBluetoothError("Web Bluetooth API is not supported in this browser.");
+      return;
+    }
+    try {
+      // Common service UUIDs for Serial Port Profile (SPP) or similar
+      // Nordic UART Service: 6E400001-B5A3-F393-E0A9-E50E24DCCA9E
+      // Standard Serial Port Service: 00001101-0000-1000-8000-00805F9B34FB
+      const device = await navigator.bluetooth.requestDevice({
+        // acceptAllDevices: true, // For broader discovery in testing
+        filters: [
+          { services: ["00001101-0000-1000-8000-00805f9b34fb"] }, // Standard Serial Port Service
+          { services: [0x1800, 0x1801, 0x180A] }, // Generic Access, Generic Attribute, Device Information (often present)
+          { namePrefix: "HC-05" }, // Common Bluetooth module name
+          { namePrefix: "HC-06" },
+          { namePrefix: "ESP32" },
+        ],
+        optionalServices: ["6e400001-b5a3-f393-e0a9-e50e24dcca9e"], // Nordic UART
+      });
+      setSelectedBluetoothDevice(device);
+      setBluetoothError(null);
+      setDebugLogs((prev) => [
+        ...prev,
+        {
+          timestamp: new Date().toISOString(),
+          type: "info",
+          message: `Bluetooth device selected: ${device.name || device.id}`,
+        },
+      ]);
+    } catch (err) {
+      if ((err as Error).name === "NotFoundError") {
+        setBluetoothError("No Bluetooth device selected or found.");
+      } else {
+        setBluetoothError("Failed to request Bluetooth device.");
+      }
+      console.error("Bluetooth device request error:", err);
+      setDebugLogs((prev) => [
+        ...prev,
+        {
+          timestamp: new Date().toISOString(),
+          type: "error",
+          message: `Bluetooth device request failed: ${err}`,
+        },
+      ]);
+    }
+  };
+
+  // Connect to selected Bluetooth device
+  const connectToBluetoothDevice = async () => {
+    if (!selectedBluetoothDevice) {
+      setBluetoothError("No Bluetooth device selected.");
+      return;
+    }
+
+    try {
+      setDebugLogs((prev) => [
+        ...prev,
+        {
+          timestamp: new Date().toISOString(),
+          type: "info",
+          message: `Attempting to connect to Bluetooth device: ${
+            selectedBluetoothDevice.name || selectedBluetoothDevice.id
+          }`,
+        },
+      ]);
+
+      const server = await selectedBluetoothDevice.gatt?.connect();
+      if (!server) {
+        throw new Error("GATT server not available.");
+      }
+
+      setDebugLogs((prev) => [
+        ...prev,
+        {
+          timestamp: new Date().toISOString(),
+          type: "info",
+          message: "Connected to GATT server.",
+        },
+      ]);
+
+       // Define well-known UUIDs
+       const NORDIC_UART_SERVICE_UUID = "6e400001-b5a3-f393-e0a9-e50e24dcca9e";
+       const NORDIC_UART_RX_CHAR_UUID = "6e400002-b5a3-f393-e0a9-e50e24dcca9e"; // Client writes to this
+       const NORDIC_UART_TX_CHAR_UUID = "6e400003-b5a3-f393-e0a9-e50e24dcca9e"; // Client receives notifications from this
+
+       const SPP_SERVICE_UUID = "00001101-0000-1000-8000-00805f9b34fb";
+       // For SPP, characteristics are not standardized.
+
+       let service;
+       let writeCharacteristic: BluetoothRemoteGATTCharacteristic;
+       let notifyCharacteristic: BluetoothRemoteGATTCharacteristic; // Separate state for notify char
+
+       try {
+         // Try Nordic UART first
+         service = await server.getPrimaryService(NORDIC_UART_SERVICE_UUID);
+         writeCharacteristic = await service.getCharacteristic(NORDIC_UART_RX_CHAR_UUID);
+         notifyCharacteristic = await service.getCharacteristic(NORDIC_UART_TX_CHAR_UUID);
+         setDebugLogs((prev) => [...prev, { timestamp: new Date().toISOString(), type: "info", message: "Using Nordic UART Service." }]);
+       } catch (e) {
+         setDebugLogs((prev) => [...prev, { timestamp: new Date().toISOString(), type: "warning", message: `Nordic UART not found (${e}), trying SPP...` }]);
+         try {
+           // Try SPP
+           service = await server.getPrimaryService(SPP_SERVICE_UUID);
+           const characteristics = await service.getCharacteristics();
+           const foundWriteChar = characteristics.find(c => c.properties.write || c.properties.writeWithoutResponse);
+           const foundNotifyChar = characteristics.find(c => c.properties.notify);
+
+           if (!foundWriteChar || !foundNotifyChar) {
+             // Attempt to use the same characteristic if one supports both, common in some SPP implementations
+             const singleCharForBoth = characteristics.find(c => (c.properties.write || c.properties.writeWithoutResponse) && c.properties.notify);
+             if (singleCharForBoth) {
+                writeCharacteristic = singleCharForBoth;
+                notifyCharacteristic = singleCharForBoth;
+                setDebugLogs((prev) => [...prev, { timestamp: new Date().toISOString(), type: "info", message: `Using SPP Service with single characteristic for Write/Notify: ${singleCharForBoth.uuid}` }]);
+             } else {
+                throw new Error("SPP service found, but required write/notify characteristics not identified clearly.");
+             }
+           } else {
+            writeCharacteristic = foundWriteChar;
+            notifyCharacteristic = foundNotifyChar;
+            setDebugLogs((prev) => [...prev, { timestamp: new Date().toISOString(), type: "info", message: `Using SPP Service. Write: ${writeCharacteristic.uuid}, Notify: ${notifyCharacteristic.uuid}` }]);
+           }
+         } catch (e2) {
+           setDebugLogs((prev) => [...prev, { timestamp: new Date().toISOString(), type: "error", message: `SPP attempt failed: ${e2}` }]);
+           throw new Error("Could not find a suitable Bluetooth serial service (Nordic UART or SPP).");
+         }
+       }
+
+       setBluetoothCharacteristic(writeCharacteristic); // Store the characteristic used for writing
+
+       // Listen for gattserverdisconnected event
+       selectedBluetoothDevice.addEventListener('gattserverdisconnected', onBluetoothDeviceDisconnected);
+
+       setIsBluetoothConnected(true);
+       setBluetoothError(null);
+       commandBufferRef.current = ""; // Reset command buffer
+       lastCommandTimeRef.current = 0;
+
+       setDebugLogs((prev) => [
+         ...prev,
+         {
+           timestamp: new Date().toISOString(),
+           type: "info",
+           message: `Bluetooth connected. Write Char: ${writeCharacteristic.uuid}, Notify Char: ${notifyCharacteristic.uuid}.`,
+         },
+       ]);
+
+       // Start notifications on the NOTIFY characteristic
+       if (notifyCharacteristic.properties.notify) {
+         await notifyCharacteristic.startNotifications();
+         notifyCharacteristic.addEventListener(
+           "characteristicvaluechanged",
+           handleBluetoothDataReceived
+         );
+         setDebugLogs((prev) => [
+          ...prev,
+          {
+            timestamp: new Date().toISOString(),
+            type: "info",
+            message: "Started Bluetooth characteristic notifications.",
+          },
+        ]);
+      } else {
+        // Fallback to polling if notify is not supported (less ideal)
+        // Or indicate that the characteristic is not suitable for receiving data this way
+        setDebugLogs((prev) => [
+            ...prev,
+            {
+              timestamp: new Date().toISOString(),
+              type: "warning",
+              message: "Bluetooth characteristic does not support notifications. Real-time data reception may not work.",
+            },
+          ]);
+      }
+    } catch (err) {
+      setBluetoothError(`Failed to connect to Bluetooth device: ${err}`);
+      console.error("Bluetooth connection error:", err);
+      setIsBluetoothConnected(false);
+      setDebugLogs((prev) => [
+        ...prev,
+        {
+          timestamp: new Date().toISOString(),
+          type: "error",
+          message: `Bluetooth connection failed: ${err}`,
+        },
+      ]);
+    }
+  };
+
+  // Disconnect from Bluetooth device
+  const disconnectFromBluetoothDevice = async () => {
+    if (!selectedBluetoothDevice || !selectedBluetoothDevice.gatt) {
+      setBluetoothError("No Bluetooth device or GATT server to disconnect from.");
+      return;
+    }
+
+    try {
+      selectedBluetoothDevice.gatt.disconnect();
+      // The onBluetoothDeviceDisconnected handler will do most of the cleanup
+    } catch (err) {
+      setBluetoothError("Failed to disconnect from Bluetooth device.");
+      console.error("Bluetooth disconnection error:", err);
+      setDebugLogs((prev) => [
+        ...prev,
+        {
+          timestamp: new Date().toISOString(),
+          type: "error",
+          message: `Bluetooth disconnection error: ${err}`,
+        },
+      ]);
+    }
+  };
+
+  // Handle Bluetooth device disconnection event
+  const onBluetoothDeviceDisconnected = () => {
+    setIsBluetoothConnected(false);
+    setBluetoothCharacteristic(null);
+    setSelectedBluetoothDevice(null); // Optionally clear the selected device
+    setBluetoothError(null); // Clear previous errors
+
+    // Remove the event listener to prevent memory leaks
+    if (selectedBluetoothDevice) {
+      selectedBluetoothDevice.removeEventListener('gattserverdisconnected', onBluetoothDeviceDisconnected);
+    }
+    // Also remove characteristic listener if it was added
+    if (bluetoothCharacteristic) {
+      (async () => {
+        try {
+          // Check if stopNotifications is needed and supported
+          if (bluetoothCharacteristic.properties.notify) {
+           await bluetoothCharacteristic.stopNotifications();
+            setDebugLogs((prev) => [
+                ...prev,
+                {
+                  timestamp: new Date().toISOString(),
+                  type: "info",
+                  message: "Stopped Bluetooth characteristic notifications.",
+                },
+              ]);
+          }
+          bluetoothCharacteristic.removeEventListener(
+            "characteristicvaluechanged",
+            handleBluetoothDataReceived
+          );
+        } catch (err) {
+          console.warn("Error stopping notifications or removing listener:", err);
+          // Log this as a warning in debug if necessary
+        setDebugLogs((prev) => [
+            ...prev,
+            {
+              timestamp: new Date().toISOString(),
+              type: "warning",
+              message: `Error during BT cleanup: ${err}`,
+            },
+          ]);
+      }
+    }
+
+    setDebugLogs((prev) => [
+      ...prev,
+      {
+        timestamp: new Date().toISOString(),
+        type: "info",
+        message: "Bluetooth device disconnected.",
+      },
+    ]);
+  };
+
+
+  // Request and list available serial ports
   const listPorts = async () => {
     try {
       const availablePorts = await navigator.serial.getPorts();
@@ -355,8 +713,19 @@ export default function SerialPortInterface({
     }
   };
 
-  // Handle received data from the serial port
-  const handleReceivedData = (data: Uint8Array) => {
+  // Handle data received from Bluetooth characteristic
+  const handleBluetoothDataReceived = (event: Event) => {
+    const target = event.target as BluetoothRemoteGATTCharacteristic;
+    if (target.value) {
+      // DataView to Uint8Array
+      const data = new Uint8Array(target.value.buffer);
+      // Pass to the existing data handler, prefixing to distinguish if needed
+      handleReceivedData(data, "BT");
+    }
+  };
+
+  // Handle received data from the serial port or bluetooth
+  const handleReceivedData = (data: Uint8Array, sourceType: "SERIAL" | "BT" = "SERIAL") => {
     // Convert the received data to a string
     const text = new TextDecoder().decode(data);
     const currentTime = Date.now();
@@ -737,13 +1106,37 @@ export default function SerialPortInterface({
     }
   };
 
-  // Send data to the serial port
+  // Send data to the serial port or Bluetooth characteristic
   const sendData = async (data: string) => {
-    if (!writerRef.current) return;
+    const encoder = new TextEncoder();
+    const encodedData = encoder.encode(data);
 
-    try {
-      const encoder = new TextEncoder();
-      await writerRef.current.write(encoder.encode(data));
+    if (isBluetoothConnected && bluetoothCharacteristic && bluetoothCharacteristic.properties.write) {
+      try {
+        await bluetoothCharacteristic.writeValue(encodedData);
+        setDebugLogs((prev) => [
+          ...prev,
+          {
+            timestamp: new Date().toISOString(),
+            type: "sent",
+            message: `BT: ${data.trim()}`,
+          },
+        ]);
+      } catch (error) {
+        console.error("Error writing to Bluetooth characteristic:", error);
+        setBluetoothError(`Failed to send data over Bluetooth: ${error}`);
+        setDebugLogs((prev) => [
+          ...prev,
+          {
+            timestamp: new Date().toISOString(),
+            type: "error",
+            message: `BT send error: ${error}`,
+          },
+        ]);
+      }
+    } else if (isConnected && writerRef.current) {
+      try {
+        await writerRef.current.write(encodedData);
 
       // Add to debug log
       setDebugLogs((prev) => [
@@ -769,7 +1162,7 @@ export default function SerialPortInterface({
 
   // Handle clock frequency changes
   const handleClockFrequencyChange = (frequency: number) => {
-    if (isConnected && selectedIC) {
+    if ((isConnected || isBluetoothConnected) && selectedIC) {
       // Send clock frequency command to the device
       sendData(`CLOCK:${frequency}\n`);
     }
@@ -778,7 +1171,7 @@ export default function SerialPortInterface({
   // Handle IC selection
   const handleICSelect = (ic: ICData | null) => {
     setSelectedIC(ic);
-    if (ic && isConnected) {
+    if (ic && (isConnected || isBluetoothConnected)) {
       // Send IC selection to the device
       sendData(`IC:${ic.partNumber}\n`);
     }
@@ -786,7 +1179,7 @@ export default function SerialPortInterface({
 
   // Handle pin state changes
   const handlePinStateChange = (newPinStates: { [key: number]: boolean }) => {
-    if (!isConnected || !selectedIC) return;
+    if (!(isConnected || isBluetoothConnected) || !selectedIC) return;
 
     // Create a binary string representing all pin states
     let pinStateStr = "";
@@ -988,83 +1381,189 @@ export default function SerialPortInterface({
       </div>
     );
   }
+  if (!isBluetoothSupported) {
+    // Optionally return a similar message or handle it differently
+    // For now, we'll allow the component to render and show errors inline
+    console.warn("Web Bluetooth API is not supported in this browser.");
+  }
 
   return (
     <div className=" gap-6">
       {/* Serial Port Connection */}
       <div className="p-6 bg-[var(--background)] rounded-lg shadow-lg">
         <h2 className="text-xl font-semibold mb-4 text-[var(--foreground)]">
-          Serial Port Connection
+          Device Connection
         </h2>
 
-        {/* Connection Status */}
-        <div className="mb-4 flex items-center">
-          <div
-            className={`w-3 h-3 rounded-full mr-2 ${
-              isConnected ? "bg-green-500" : "bg-red-500"
-            }`}
-          ></div>
-          <span className="text-[var(--foreground)]">
-            {isConnected ? "Connected" : "Disconnected"}
-          </span>
-        </div>
-
-        {/* Port Selection */}
+        {/* Connection Type Selector (Tabs or Radio Buttons) - Example with simple text for now */}
         <div className="mb-4">
-          <select
-            className="w-full p-2 border rounded bg-neutral-800 text-[var(--foreground)] border-neutral-600"
-            value={
-              selectedPort
-                ? ports.findIndex((p) => p.port === selectedPort)
-                : ""
-            }
-            onChange={(e) => {
-              const index = parseInt(e.target.value);
-              setSelectedPort(index >= 0 ? ports[index].port : null);
-            }}
-            disabled={isConnected}
+          <span className="text-[var(--foreground)] mr-4">Connect via:</span>
+          <button
+            onClick={() => setConnectionType("serial")}
+            className={`px-3 py-1 border rounded mr-2 ${
+              connectionType === "serial"
+                ? "bg-blue-500 text-white"
+                : "bg-gray-700 text-gray-300 hover:bg-gray-600"
+            }`}
+            disabled={isConnected || isBluetoothConnected}
           >
-            <option value="">Select a port</option>
-            {ports.map((port, index) => (
-              <option key={index} value={index}>
-                {`Port ${index + 1} - ${port.info.usbVendorId || "Unknown"}`}
-              </option>
-            ))}
-          </select>
+            Serial
+          </button>
+          {isBluetoothSupported && (
+            <button
+              onClick={() => setConnectionType("bluetooth")}
+              className={`px-3 py-1 border rounded ${
+                connectionType === "bluetooth"
+                  ? "bg-blue-500 text-white"
+                  : "bg-gray-700 text-gray-300 hover:bg-gray-600"
+              }`}
+              disabled={isConnected || isBluetoothConnected}
+            >
+              Bluetooth
+            </button>
+          )}
         </div>
 
-        {/* Action Buttons */}
-        <div className="space-x-2">
-          <button
-            onClick={requestPort}
-            disabled={isConnected}
-            className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 disabled:opacity-50"
-          >
-            Request Port
-          </button>
-          <button
-            onClick={isConnected ? disconnectFromPort : connectToPort}
-            disabled={!selectedPort}
-            className={`px-4 py-2 rounded-md ${
-              isConnected
-                ? "bg-red-500 hover:bg-red-600"
-                : "bg-green-500 hover:bg-green-600"
-            } text-white disabled:opacity-50`}
-          >
-            {isConnected ? "Disconnect" : "Connect"}
-          </button>
-        </div>
+        {connectionType === "serial" && isSerialSupported && (
+          <>
+            {/* Serial Connection Status */}
+            <div className="mb-4 flex items-center">
+              <div
+                className={`w-3 h-3 rounded-full mr-2 ${
+                  isConnected ? "bg-green-500" : "bg-red-500"
+                }`}
+              ></div>
+              <span className="text-[var(--foreground)]">
+                Serial: {isConnected ? "Connected" : "Disconnected"}
+              </span>
+            </div>
 
-        {/* Error Messages */}
-        {error && (
-          <div className="mt-4 p-2 bg-red-900 text-red-100 rounded-md">
-            {error}
+            {/* Port Selection */}
+            <div className="mb-4">
+              <select
+                className="w-full p-2 border rounded bg-neutral-800 text-[var(--foreground)] border-neutral-600"
+                value={
+                  selectedPort
+                    ? ports.findIndex((p) => p.port === selectedPort)
+                    : ""
+                }
+                onChange={(e) => {
+                  const index = parseInt(e.target.value);
+                  setSelectedPort(index >= 0 ? ports[index].port : null);
+                }}
+                disabled={isConnected || isBluetoothConnected}
+              >
+                <option value="">Select a serial port</option>
+                {ports.map((port, index) => (
+                  <option key={index} value={index}>
+                    {`Port ${index + 1} - ${
+                      port.info.usbVendorId || "Unknown"
+                    }`}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="space-x-2">
+              <button
+                onClick={requestPort}
+                disabled={isConnected || isBluetoothConnected}
+                className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 disabled:opacity-50"
+              >
+                Request Serial Port
+              </button>
+              <button
+                onClick={isConnected ? disconnectFromPort : connectToPort}
+                disabled={!selectedPort || isBluetoothConnected}
+                className={`px-4 py-2 rounded-md ${
+                  isConnected
+                    ? "bg-red-500 hover:bg-red-600"
+                    : "bg-green-500 hover:bg-green-600"
+                } text-white disabled:opacity-50`}
+              >
+                {isConnected ? "Disconnect Serial" : "Connect Serial"}
+              </button>
+            </div>
+
+            {/* Error Messages */}
+            {error && (
+              <div className="mt-4 p-2 bg-red-900 text-red-100 rounded-md">
+                {error}
+              </div>
+            )}
+          </>
+        )}
+
+        {connectionType === "bluetooth" && isBluetoothSupported && (
+          <>
+            <div className="mb-4 flex items-center">
+              <div
+                className={`w-3 h-3 rounded-full mr-2 ${
+                  isBluetoothConnected ? "bg-green-500" : "bg-red-500"
+                }`}
+              ></div>
+              <span className="text-[var(--foreground)]">
+                Bluetooth:{" "}
+                {isBluetoothConnected
+                  ? `Connected to ${
+                      selectedBluetoothDevice?.name ||
+                      selectedBluetoothDevice?.id ||
+                      "device"
+                    }`
+                  : "Disconnected"}
+              </span>
+            </div>
+            <div className="space-x-2">
+              <button
+                onClick={requestBluetoothDevice}
+                disabled={isBluetoothConnected || isConnected}
+                className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 disabled:opacity-50"
+              >
+                Request Bluetooth Device
+              </button>
+              <button
+                onClick={
+                  isBluetoothConnected
+                    ? disconnectFromBluetoothDevice
+                    : connectToBluetoothDevice
+                }
+                disabled={!selectedBluetoothDevice || isConnected}
+                className={`px-4 py-2 rounded-md ${
+                  isBluetoothConnected
+                    ? "bg-red-500 hover:bg-red-600"
+                    : "bg-green-500 hover:bg-green-600"
+                } text-white disabled:opacity-50`}
+              >
+                {isBluetoothConnected
+                  ? "Disconnect Bluetooth"
+                  : "Connect Bluetooth"}
+              </button>
+            </div>
+            {selectedBluetoothDevice && !isBluetoothConnected && (
+                <p className="text-sm text-neutral-400 mt-2">Selected device: {selectedBluetoothDevice.name || selectedBluetoothDevice.id}</p>
+            )}
+            {bluetoothError && (
+              <div className="mt-4 p-2 bg-red-900 text-red-100 rounded-md">
+                {bluetoothError}
+              </div>
+            )}
+          </>
+        )}
+         {!isSerialSupported && connectionType === "serial" && (
+          <div className="p-4 bg-yellow-700 text-yellow-100 rounded-md">
+            Web Serial API is not supported in this browser. Please use Chrome or Edge.
+          </div>
+        )}
+        {!isBluetoothSupported && connectionType === "bluetooth" && (
+          <div className="p-4 bg-yellow-700 text-yellow-100 rounded-md">
+            Web Bluetooth API is not supported in this browser. Please use compatible Chrome/Edge.
           </div>
         )}
       </div>
 
       {/* IC Selection and Visualization */}
-      <div className="p-6 bg-[var(--background)] rounded-lg shadow-lg">
+      <div className="p-6 bg-[var(--background)] rounded-lg shadow-lg mt-6">
         <h2 className="text-xl font-semibold mb-4 text-[var(--foreground)]">
           IC Configuration
         </h2>
@@ -1075,7 +1574,7 @@ export default function SerialPortInterface({
               <ICVisualizer
                 ic={selectedIC}
                 onPinStateChange={handlePinStateChange}
-                serialConnected={isConnected}
+                serialConnected={isConnected || isBluetoothConnected} // Updated
                 currentPinStates={pinStates}
               />
             </div>
@@ -1084,7 +1583,7 @@ export default function SerialPortInterface({
               currentPinStates={pinStates}
               onPinStateChange={handlePinStateChange}
               onClockFrequencyChange={handleClockFrequencyChange}
-              isConnected={isConnected}
+              isConnected={isConnected || isBluetoothConnected} // Updated
             />
           </>
         )}
@@ -1113,14 +1612,14 @@ export default function SerialPortInterface({
             </button>
             <button
               onClick={() => {
-                if (isConnected) {
+                if (isConnected || isBluetoothConnected) {
                   sendData("SYNC\n");
                 }
               }}
-              disabled={!isConnected}
+              disabled={!(isConnected || isBluetoothConnected)}
               className="px-4 py-2 text-sm bg-blue-700 text-blue-100 rounded-md hover:bg-blue-600 dark:bg-blue-900 dark:text-blue-100 dark:hover:bg-blue-800 disabled:opacity-50"
             >
-              Request Sync
+              Request Sync (Current: {connectionType})
             </button>
             <button
               onClick={() => {
@@ -1129,9 +1628,9 @@ export default function SerialPortInterface({
                   {
                     timestamp: new Date().toISOString(),
                     type: "info",
-                    message: `Current buffer content: "${commandBufferRef.current}"`,
-                  },
-                ]);
+      message: `Raw data received (${sourceType}): "${text}" (buffer now: "${commandBufferRef.current}")`,
+    },
+  ]);
               }}
               className="px-4 py-2 text-sm bg-yellow-700 text-yellow-100 rounded-md hover:bg-yellow-600 dark:bg-yellow-900 dark:text-yellow-100 dark:hover:bg-yellow-800"
             >
