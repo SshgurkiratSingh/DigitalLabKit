@@ -417,7 +417,6 @@ export default function BLEInterface({ onICSelect: parentOnICSelect }: BLEInterf
         </h2>
         <ICSelector
           onICSelect={handleLocalICSelect}
-          allICs={allICs}
         />
         {selectedIC && (
           <>
