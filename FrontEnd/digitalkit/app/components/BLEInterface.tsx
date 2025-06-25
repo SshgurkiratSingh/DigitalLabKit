@@ -434,7 +434,6 @@ export default function BLEInterface({ onICSelect: parentOnICSelect }: BLEInterf
               onPinStateChange={handleOutgoingPinStateUpdate}
               onClockFrequencyChange={handleOutgoingClockFrequencyChange}
               isConnected={isConnected}
-              allICs={allICs}
             />
           </>
         )}
