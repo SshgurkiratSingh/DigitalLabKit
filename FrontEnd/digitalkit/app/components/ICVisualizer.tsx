@@ -29,10 +29,12 @@ function ICImage({
   partNumber,
   onClick,
   fullScreen = false,
+  scale = 1,
 }: {
   partNumber: string;
   onClick?: () => void;
   fullScreen?: boolean;
+  scale?: number;
 }) {
   const [imgSrc, setImgSrc] = useState(`/ic_img/${partNumber}.png`);
   const [triedJpg, setTriedJpg] = useState(false);
@@ -50,6 +52,41 @@ function ICImage({
       setImgSrc("/ic_img/placeholder.png");
     }
   };
+
+  if (fullScreen) {
+    return (
+      <div
+        className="relative"
+        style={{
+          width: "min(90vw, 600px)",
+          height: "min(80vh, 400px)",
+          minWidth: 0,
+          minHeight: 0,
+        }}
+      >
+        <img
+          src={imgSrc}
+          alt={`${partNumber} IC`}
+          onClick={onClick}
+          onError={handleError}
+          style={{
+            position: "absolute",
+            top: "50%",
+            left: "50%",
+            maxWidth: "100%",
+            maxHeight: "100%",
+            transform: `translate(-50%, -50%) scale(${scale})`,
+            transformOrigin: "center center",
+            transition: "transform 0.2s",
+            objectFit: "contain",
+            display: "block",
+          }}
+          tabIndex={0}
+          aria-label="Enlarge IC image"
+        />
+      </div>
+    );
+  }
 
   const className = fullScreen
     ? "h-full max-h-[80vh] max-w-[90vw] object-contain"
@@ -159,6 +196,7 @@ export default function ICVisualizer({
   const [currentPdfPath, setCurrentPdfPath] = useState<string | null>(null);
   const [isFullScreenView, setIsFullScreenView] = useState<boolean>(false);
   const [pressedPinsLog, setPressedPinsLog] = useState<string[]>([]);
+  const [imageScale, setImageScale] = useState(1);
 
   // Helper to reset all pins to false
   const resetAllPins = () => {
@@ -171,17 +209,19 @@ export default function ICVisualizer({
     onPinStateChange?.(newStates);
   };
 
-  // Reset pins when exiting fullscreen or when IC changes
+  // Reset pins and image scale when exiting fullscreen or when IC changes
   useEffect(() => {
     if (!isFullScreenView) {
       resetAllPins();
       setPressedPinsLog([]);
+      setImageScale(1);
     }
   }, [isFullScreenView]); // eslint-disable-line
 
   useEffect(() => {
     resetAllPins();
     setPressedPinsLog([]);
+    setImageScale(1);
   }, [ic]); // eslint-disable-line
 
   // Sync with currentPinStates if provided
@@ -215,20 +255,19 @@ export default function ICVisualizer({
 
   if (!ic) return null;
 
+  // ----------- FIXED: Always log pin presses (not just in fullscreen) -----------
   const togglePin = (pinNumber: number, pinType: string) => {
     if (!serialConnected || pinType !== "INPUT") return;
 
-    if (isFullScreenView) {
-      const pin = ic.pinConfiguration.find(p => p.pin === pinNumber);
-      if (pin) {
-        setPressedPinsLog(prev => {
-          const newLog = [
-            `Pin ${pin.pin} (${pin.name}, ${pin.type}) pressed`,
-            ...prev,
-          ];
-          return newLog.slice(0, 3); // Keep only last 3
-        });
-      }
+    const pin = ic.pinConfiguration.find(p => p.pin === pinNumber);
+    if (pin) {
+      setPressedPinsLog(prev => {
+        const newLog = [
+          `Pin ${pin.pin} (${pin.name}, ${pin.type}) pressed`,
+          ...prev,
+        ];
+        return newLog.slice(0, 3); // Keep only last 3
+      });
     }
 
     const newStates = {
@@ -238,6 +277,7 @@ export default function ICVisualizer({
     setLocalPinStates(newStates);
     onPinStateChange?.(newStates);
   };
+  // ------------------------------------------------------------------------------
 
   const getPinColor = (pinType: string, pinNumber: number) => {
     if (pinType === "POWER") return "bg-yellow-500";
@@ -304,38 +344,65 @@ export default function ICVisualizer({
     alert("Datasheet not found for this IC.");
   };
 
-  // --- PIN SIZING LOGIC ---
+  // --- SMALLER PIN SIZING LOGIC ---
   const pinCircleClass = isFullScreenView
-    ? "w-16 h-16 md:w-20 md:h-20"
-    : "w-6 h-6 md:w-7 md:h-7";
+    ? "w-8 h-8 md:w-10 md:h-10"
+    : "w-4 h-4 md:w-5 md:h-5";
   const pinTextClass = isFullScreenView
-    ? "text-2xl md:text-3xl"
-    : "text-xs md:text-sm";
+    ? "text-base md:text-lg"
+    : "text-[10px] md:text-xs";
   const pinLabelClass = isFullScreenView
-    ? "text-lg md:text-xl"
-    : "text-xs md:text-sm";
+    ? "text-sm md:text-base"
+    : "text-xs";
   const pinSpaceY = isFullScreenView
-    ? "space-y-4 md:space-y-6"
-    : "space-y-1.5 md:space-y-2";
+    ? "space-y-2 md:space-y-3"
+    : "space-y-1";
   const pinSpaceX = isFullScreenView
-    ? "space-x-4 md:space-x-6"
-    : "space-x-2 md:space-x-3";
+    ? "space-x-2 md:space-x-3"
+    : "space-x-1";
 
   // --- FULL SCREEN VIEW ---
   if (isFullScreenView) {
     return (
       <div className="fixed top-0 left-0 right-0 bottom-0 w-screen h-screen bg-black z-50 flex flex-col items-center justify-center p-4 md:p-8">
-        {/* Pressed Pins Log */}
-        <div className="fixed top-8 left-1/2 transform -translate-x-1/2 z-60 flex flex-col items-center w-full max-w-xl">
-          {pressedPinsLog.map((msg, idx) => (
-            <div
-              key={idx}
-              className="mb-2 bg-white bg-opacity-80 text-black px-6 py-2 rounded-lg shadow text-lg font-semibold w-fit"
-            >
-              {msg}
-            </div>
-          ))}
+        {/* Image size slider for user control */}
+        <div className="absolute top-6 left-1/2 transform -translate-x-1/2 flex items-center bg-white bg-opacity-80 rounded px-4 py-2 z-60">
+          <label htmlFor="ic-image-scale" className="mr-2 text-sm font-medium text-black">
+            IC Image Size
+          </label>
+          <input
+            id="ic-image-scale"
+            type="range"
+            min={0.5}
+            max={2}
+            step={0.05}
+            value={imageScale}
+            onChange={e => setImageScale(Number(e.target.value))}
+            className="w-40 mx-2"
+          />
+          <span className="text-black text-xs">{Math.round(imageScale * 100)}%</span>
         </div>
+
+        {/* --- Pin Press Log Table (Full Screen Only) --- */}
+        {pressedPinsLog.length > 0 && (
+          <div className="fixed top-24 left-1/2 transform -translate-x-1/2 z-60 flex flex-col items-center w-full max-w-xl">
+            <h4 className="text-sm font-semibold mb-2 text-black bg-white bg-opacity-80 rounded px-4 py-2">Pin Press Log:</h4>
+            <table className="w-full text-xs bg-white bg-opacity-90 rounded shadow">
+              <thead>
+                <tr>
+                  <th className="py-1 px-2 text-left">Event</th>
+                </tr>
+              </thead>
+              <tbody>
+                {pressedPinsLog.map((msg, idx) => (
+                  <tr key={idx}>
+                    <td className="py-1 px-2 border-b">{msg}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
 
         <button
           onClick={() => setIsFullScreenView(false)}
@@ -370,9 +437,9 @@ export default function ICVisualizer({
             ))}
           </div>
 
-          {/* IC Image in Center - much larger */}
+          {/* IC Image in Center */}
           <div className="mx-4 flex items-center justify-center h-auto max-h-[80vh] max-w-[90vw] my-4">
-            <ICImage partNumber={ic.partNumber} fullScreen />
+            <ICImage partNumber={ic.partNumber} fullScreen scale={imageScale} />
           </div>
 
           {/* Right Pins */}
@@ -405,7 +472,7 @@ export default function ICVisualizer({
     );
   }
 
-  // Default view
+  // --- DEFAULT VIEW (no log table here) ---
   return (
     <div className="p-4 bg-[var(--background)] rounded-lg shadow w-full">
       <div className="flex justify-between items-center mb-4">
@@ -422,23 +489,23 @@ export default function ICVisualizer({
 
       <div className="flex justify-between items-center">
         {/* Left Pins */}
-        <div className="space-y-2">
+        <div className="space-y-1">
           {leftPins.map(pin => (
             <div
               key={pin.pin}
-              className="flex items-center space-x-2 cursor-pointer"
+              className="flex items-center space-x-1 cursor-pointer"
               onClick={() => togglePin(pin.pin, pin.type)}
             >
               <div
-                className={`w-6 h-6 rounded-full ${getPinColor(pin.type, pin.pin)} ${
+                className={`w-4 h-4 rounded-full ${getPinColor(pin.type, pin.pin)} ${
                   pin.type === "INPUT" && serialConnected
                     ? "cursor-pointer hover:opacity-80"
                     : ""
                 } flex items-center justify-center`}
               >
-                <span className="text-white text-sm">{pin.pin}</span>
+                <span className="text-white text-[10px]">{pin.pin}</span>
               </div>
-              <span className="text-sm text-[var(--foreground)]">
+              <span className="text-xs text-[var(--foreground)]">
                 {pin.name} ({pin.type})
               </span>
             </div>
@@ -446,29 +513,28 @@ export default function ICVisualizer({
         </div>
 
         {/* IC Image in Center */}
-        <div className="mx-4 flex items-center justify-center h-auto max-h-[400px] md:max-h-[500px] my-4">
+        <div className="mx-4 flex items-center justify-center h-auto max-h-[120px] md:max-h-[150px] my-4">
           <ICImage partNumber={ic.partNumber} onClick={handleImageClick} />
         </div>
-
         {/* Right Pins */}
-        <div className="space-y-2">
+        <div className="space-y-1">
           {rightPins.map(pin => (
             <div
               key={pin.pin}
-              className="flex items-center space-x-2 cursor-pointer"
+              className="flex items-center space-x-1 cursor-pointer"
               onClick={() => togglePin(pin.pin, pin.type)}
             >
-              <span className="text-sm text-right text-[var(--foreground)]">
+              <span className="text-xs text-right text-[var(--foreground)]">
                 {pin.name} ({pin.type})
               </span>
               <div
-                className={`w-6 h-6 rounded-full ${getPinColor(pin.type, pin.pin)} ${
+                className={`w-4 h-4 rounded-full ${getPinColor(pin.type, pin.pin)} ${
                   pin.type === "INPUT" && serialConnected
                     ? "cursor-pointer hover:opacity-80"
                     : ""
                 } flex items-center justify-center`}
               >
-                <span className="text-white text-sm">{pin.pin}</span>
+                <span className="text-white text-[10px]">{pin.pin}</span>
               </div>
             </div>
           ))}
