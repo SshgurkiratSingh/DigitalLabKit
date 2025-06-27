@@ -51,7 +51,6 @@ function ICImage({
     }
   };
 
-  // Make image much bigger in full screen
   const className = fullScreen
     ? "h-full max-h-[80vh] max-w-[90vw] object-contain"
     : "h-full max-h-[200px] object-contain cursor-zoom-in";
@@ -159,7 +158,33 @@ export default function ICVisualizer({
   const [showPdfModal, setShowPdfModal] = useState<boolean>(false);
   const [currentPdfPath, setCurrentPdfPath] = useState<string | null>(null);
   const [isFullScreenView, setIsFullScreenView] = useState<boolean>(false);
+  const [pressedPinsLog, setPressedPinsLog] = useState<string[]>([]);
 
+  // Helper to reset all pins to false
+  const resetAllPins = () => {
+    if (!ic) return;
+    const newStates: { [key: number]: boolean } = {};
+    ic.pinConfiguration.forEach(pin => {
+      newStates[pin.pin] = false;
+    });
+    setLocalPinStates(newStates);
+    onPinStateChange?.(newStates);
+  };
+
+  // Reset pins when exiting fullscreen or when IC changes
+  useEffect(() => {
+    if (!isFullScreenView) {
+      resetAllPins();
+      setPressedPinsLog([]);
+    }
+  }, [isFullScreenView]); // eslint-disable-line
+
+  useEffect(() => {
+    resetAllPins();
+    setPressedPinsLog([]);
+  }, [ic]); // eslint-disable-line
+
+  // Sync with currentPinStates if provided
   useEffect(() => {
     if (ic) {
       const newStates = { ...localPinStates };
@@ -192,6 +217,19 @@ export default function ICVisualizer({
 
   const togglePin = (pinNumber: number, pinType: string) => {
     if (!serialConnected || pinType !== "INPUT") return;
+
+    if (isFullScreenView) {
+      const pin = ic.pinConfiguration.find(p => p.pin === pinNumber);
+      if (pin) {
+        setPressedPinsLog(prev => {
+          const newLog = [
+            `Pin ${pin.pin} (${pin.name}, ${pin.type}) pressed`,
+            ...prev,
+          ];
+          return newLog.slice(0, 3); // Keep only last 3
+        });
+      }
+    }
 
     const newStates = {
       ...localPinStates,
@@ -266,37 +304,66 @@ export default function ICVisualizer({
     alert("Datasheet not found for this IC.");
   };
 
-  // FULL SCREEN VIEW
+  // --- PIN SIZING LOGIC ---
+  const pinCircleClass = isFullScreenView
+    ? "w-16 h-16 md:w-20 md:h-20"
+    : "w-6 h-6 md:w-7 md:h-7";
+  const pinTextClass = isFullScreenView
+    ? "text-2xl md:text-3xl"
+    : "text-xs md:text-sm";
+  const pinLabelClass = isFullScreenView
+    ? "text-lg md:text-xl"
+    : "text-xs md:text-sm";
+  const pinSpaceY = isFullScreenView
+    ? "space-y-4 md:space-y-6"
+    : "space-y-1.5 md:space-y-2";
+  const pinSpaceX = isFullScreenView
+    ? "space-x-4 md:space-x-6"
+    : "space-x-2 md:space-x-3";
+
+  // --- FULL SCREEN VIEW ---
   if (isFullScreenView) {
     return (
       <div className="fixed top-0 left-0 right-0 bottom-0 w-screen h-screen bg-black z-50 flex flex-col items-center justify-center p-4 md:p-8">
+        {/* Pressed Pins Log */}
+        <div className="fixed top-8 left-1/2 transform -translate-x-1/2 z-60 flex flex-col items-center w-full max-w-xl">
+          {pressedPinsLog.map((msg, idx) => (
+            <div
+              key={idx}
+              className="mb-2 bg-white bg-opacity-80 text-black px-6 py-2 rounded-lg shadow text-lg font-semibold w-fit"
+            >
+              {msg}
+            </div>
+          ))}
+        </div>
+
         <button
-          onClick={() => setIsFullScreenView(!isFullScreenView)}
+          onClick={() => setIsFullScreenView(false)}
           className="absolute top-5 right-5 px-4 py-2 bg-red-600 text-white font-bold rounded hover:bg-red-700 z-60 text-sm md:text-base"
         >
           Exit Full Screen
         </button>
         <div className="flex justify-around items-center w-full max-w-6xl max-h-[95vh]">
           {/* Left Pins */}
-          <div className="space-y-1.5 md:space-y-2">
+          <div className={pinSpaceY}>
             {leftPins.map(pin => (
               <div
                 key={pin.pin}
-                className="flex items-center space-x-2 md:space-x-3 cursor-pointer"
+                className={`flex items-center ${pinSpaceX} cursor-pointer`}
                 onClick={() => togglePin(pin.pin, pin.type)}
               >
                 <div
-                  className={`w-6 h-6 md:w-7 md:h-7 rounded-full ${getPinColor(pin.type, pin.pin)} ${
+                  className={`${pinCircleClass} rounded-full ${getPinColor(pin.type, pin.pin)} ${
                     pin.type === "INPUT" && serialConnected
                       ? "cursor-pointer hover:opacity-80"
                       : ""
-                  }`}
+                  } flex items-center justify-center`}
                 >
-                  <span className="flex items-center justify-center text-white text-xs md:text-sm">
+                  <span className={`text-white font-bold ${pinTextClass}`}>
                     {pin.pin}
                   </span>
                 </div>
-                <span className="text-xs md:text-sm text-slate-200">
+                <span className={`${pinLabelClass} text-slate-200`}>
                   {pin.name} ({pin.type})
                 </span>
               </div>
@@ -309,24 +376,24 @@ export default function ICVisualizer({
           </div>
 
           {/* Right Pins */}
-          <div className="space-y-1.5 md:space-y-2">
+          <div className={pinSpaceY}>
             {rightPins.map(pin => (
               <div
                 key={pin.pin}
-                className="flex items-center space-x-2 md:space-x-3 cursor-pointer"
+                className={`flex items-center ${pinSpaceX} cursor-pointer`}
                 onClick={() => togglePin(pin.pin, pin.type)}
               >
-                <span className="text-xs md:text-sm text-right text-slate-200">
+                <span className={`${pinLabelClass} text-right text-slate-200`}>
                   {pin.name} ({pin.type})
                 </span>
                 <div
-                  className={`w-6 h-6 md:w-7 md:h-7 rounded-full ${getPinColor(pin.type, pin.pin)} ${
+                  className={`${pinCircleClass} rounded-full ${getPinColor(pin.type, pin.pin)} ${
                     pin.type === "INPUT" && serialConnected
                       ? "cursor-pointer hover:opacity-80"
                       : ""
-                  }`}
+                  } flex items-center justify-center`}
                 >
-                  <span className="flex items-center justify-center text-white text-xs md:text-sm">
+                  <span className={`text-white font-bold ${pinTextClass}`}>
                     {pin.pin}
                   </span>
                 </div>
@@ -367,11 +434,9 @@ export default function ICVisualizer({
                   pin.type === "INPUT" && serialConnected
                     ? "cursor-pointer hover:opacity-80"
                     : ""
-                }`}
+                } flex items-center justify-center`}
               >
-                <span className="flex items-center justify-center text-white text-sm">
-                  {pin.pin}
-                </span>
+                <span className="text-white text-sm">{pin.pin}</span>
               </div>
               <span className="text-sm text-[var(--foreground)]">
                 {pin.name} ({pin.type})
@@ -401,11 +466,9 @@ export default function ICVisualizer({
                   pin.type === "INPUT" && serialConnected
                     ? "cursor-pointer hover:opacity-80"
                     : ""
-                }`}
+                } flex items-center justify-center`}
               >
-                <span className="flex items-center justify-center text-white text-sm">
-                  {pin.pin}
-                </span>
+                <span className="text-white text-sm">{pin.pin}</span>
               </div>
             </div>
           ))}
