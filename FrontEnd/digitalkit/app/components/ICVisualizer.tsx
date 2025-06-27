@@ -28,9 +28,11 @@ interface ICVisualizerProps {
 function ICImage({
   partNumber,
   onClick,
+  fullScreen = false,
 }: {
   partNumber: string;
   onClick?: () => void;
+  fullScreen?: boolean;
 }) {
   const [imgSrc, setImgSrc] = useState(`/ic_img/${partNumber}.png`);
   const [triedJpg, setTriedJpg] = useState(false);
@@ -49,11 +51,16 @@ function ICImage({
     }
   };
 
+  // Make image much bigger in full screen
+  const className = fullScreen
+    ? "h-full max-h-[80vh] max-w-[90vw] object-contain"
+    : "h-full max-h-[200px] object-contain cursor-zoom-in";
+
   return (
     <img
       src={imgSrc}
       alt={`${partNumber} IC`}
-      className="h-full max-h-[200px] object-contain cursor-zoom-in"
+      className={className}
       onClick={onClick}
       onError={handleError}
       style={{ transition: "box-shadow 0.2s" }}
@@ -110,27 +117,27 @@ function PdfModal({
 }) {
   return (
     <div
-      className="fixed inset-0 z-60 flex items-center justify-center bg-black bg-opacity-80" // Higher z-index than ImageModal
+      className="fixed inset-0 z-60 flex items-center justify-center bg-black bg-opacity-80"
       onClick={onClose}
       tabIndex={-1}
       aria-modal="true"
       role="dialog"
     >
       <div
-        className="bg-black p-2 rounded-lg shadow-lg" // Added padding and rounded corners for the iframe container
+        className="bg-black p-2 rounded-lg shadow-lg"
         style={{ width: "90vw", height: "90vh" }}
-        onClick={e => e.stopPropagation()} // Prevent modal close when clicking inside PDF content
+        onClick={e => e.stopPropagation()}
       >
         <iframe
           src={pdfPath}
           width="100%"
           height="100%"
           title="PDF Viewer"
-          style={{ border: "none" }} // Remove default iframe border
+          style={{ border: "none" }}
         />
       </div>
       <button
-        className="absolute top-4 right-6 text-white text-3xl font-bold" // Style similar to ImageModal close button
+        className="absolute top-4 right-6 text-white text-3xl font-bold"
         onClick={onClose}
         aria-label="Close PDF viewer"
         tabIndex={0}
@@ -259,45 +266,46 @@ export default function ICVisualizer({
     alert("Datasheet not found for this IC.");
   };
 
+  // FULL SCREEN VIEW
   if (isFullScreenView) {
     return (
-      <div
-className="fixed top-0 left-0 right-0 bottom-0 w-screen h-screen bg-black z-50 flex flex-col items-center justify-center p-4 md:p-8"
-      >
+      <div className="fixed top-0 left-0 right-0 bottom-0 w-screen h-screen bg-black z-50 flex flex-col items-center justify-center p-4 md:p-8">
         <button
           onClick={() => setIsFullScreenView(!isFullScreenView)}
           className="absolute top-5 right-5 px-4 py-2 bg-red-600 text-white font-bold rounded hover:bg-red-700 z-60 text-sm md:text-base"
         >
           Exit Full Screen
         </button>
-        <div className="flex justify-around items-center w-full max-w-5xl max-h-[90vh]"> {/* Increased max-width, added max-height */}
+        <div className="flex justify-around items-center w-full max-w-6xl max-h-[95vh]">
           {/* Left Pins */}
-          <div className="space-y-1.5 md:space-y-2"> {/* Adjusted spacing */}
+          <div className="space-y-1.5 md:space-y-2">
             {leftPins.map(pin => (
               <div
                 key={pin.pin}
-                className="flex items-center space-x-2 md:space-x-3 cursor-pointer" // Adjusted spacing
+                className="flex items-center space-x-2 md:space-x-3 cursor-pointer"
                 onClick={() => togglePin(pin.pin, pin.type)}
               >
                 <div
-                  className={`w-6 h-6 md:w-7 md:h-7 rounded-full ${getPinColor(pin.type, pin.pin)} ${ // Slightly larger pins
+                  className={`w-6 h-6 md:w-7 md:h-7 rounded-full ${getPinColor(pin.type, pin.pin)} ${
                     pin.type === "INPUT" && serialConnected
                       ? "cursor-pointer hover:opacity-80"
                       : ""
                   }`}
                 >
-                  <span className="flex items-center justify-center text-white text-xs md:text-sm"> {/* Adjusted text size */}
+                  <span className="flex items-center justify-center text-white text-xs md:text-sm">
                     {pin.pin}
                   </span>
                 </div>
-                <span className="text-xs md:text-sm text-slate-200">{pin.name} ({pin.type})</span> {/* Adjusted text color for slate bg */}
+                <span className="text-xs md:text-sm text-slate-200">
+                  {pin.name} ({pin.type})
+                </span>
               </div>
             ))}
           </div>
 
-          {/* IC Image in Center - larger */}
-          <div className="mx-4 flex items-center justify-center h-auto max-h-[400px] md:max-h-[500px] my-4">
-            <ICImage partNumber={ic.partNumber} /> {/* onClick for modal removed here */}
+          {/* IC Image in Center - much larger */}
+          <div className="mx-4 flex items-center justify-center h-auto max-h-[80vh] max-w-[90vw] my-4">
+            <ICImage partNumber={ic.partNumber} fullScreen />
           </div>
 
           {/* Right Pins */}
@@ -308,7 +316,9 @@ className="fixed top-0 left-0 right-0 bottom-0 w-screen h-screen bg-black z-50 f
                 className="flex items-center space-x-2 md:space-x-3 cursor-pointer"
                 onClick={() => togglePin(pin.pin, pin.type)}
               >
-                <span className="text-xs md:text-sm text-right text-slate-200">{pin.name} ({pin.type})</span>
+                <span className="text-xs md:text-sm text-right text-slate-200">
+                  {pin.name} ({pin.type})
+                </span>
                 <div
                   className={`w-6 h-6 md:w-7 md:h-7 rounded-full ${getPinColor(pin.type, pin.pin)} ${
                     pin.type === "INPUT" && serialConnected
@@ -371,7 +381,7 @@ className="fixed top-0 left-0 right-0 bottom-0 w-screen h-screen bg-black z-50 f
         </div>
 
         {/* IC Image in Center */}
-        <div className="mx-4 flex items-center justify-center">
+        <div className="mx-4 flex items-center justify-center h-auto max-h-[400px] md:max-h-[500px] my-4">
           <ICImage partNumber={ic.partNumber} onClick={handleImageClick} />
         </div>
 
