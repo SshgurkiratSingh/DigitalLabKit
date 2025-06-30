@@ -255,19 +255,16 @@ export default function ICVisualizer({
 
   if (!ic) return null;
 
-  // ----------- FIXED: Always log pin presses (not just in fullscreen) -----------
+  // Always log pin presses (show all presses, not just last 3)
   const togglePin = (pinNumber: number, pinType: string) => {
     if (!serialConnected || pinType !== "INPUT") return;
 
     const pin = ic.pinConfiguration.find(p => p.pin === pinNumber);
     if (pin) {
-      setPressedPinsLog(prev => {
-        const newLog = [
-          `Pin ${pin.pin} (${pin.name}, ${pin.type}) pressed`,
-          ...prev,
-        ];
-        return newLog.slice(0, 3); // Keep only last 3
-      });
+      setPressedPinsLog(prev => [
+        `Pin ${pin.pin} (${pin.name}, ${pin.type}) pressed`,
+        ...prev,
+      ]);
     }
 
     const newStates = {
@@ -277,7 +274,6 @@ export default function ICVisualizer({
     setLocalPinStates(newStates);
     onPinStateChange?.(newStates);
   };
-  // ------------------------------------------------------------------------------
 
   const getPinColor = (pinType: string, pinNumber: number) => {
     if (pinType === "POWER") return "bg-yellow-500";
@@ -364,7 +360,7 @@ export default function ICVisualizer({
   // --- FULL SCREEN VIEW ---
   if (isFullScreenView) {
     return (
-      <div className="fixed top-0 left-0 right-0 bottom-0 w-screen h-screen bg-black z-50 flex flex-col items-center justify-center p-4 md:p-8">
+      <div className="fixed top-0 left-0 right-0 bottom-0 w-screen h-screen bg-black z-50 flex flex-col">
         {/* Image size slider for user control */}
         <div className="absolute top-6 left-1/2 transform -translate-x-1/2 flex items-center bg-white bg-opacity-80 rounded px-4 py-2 z-60">
           <label htmlFor="ic-image-scale" className="mr-2 text-sm font-medium text-black">
@@ -383,34 +379,15 @@ export default function ICVisualizer({
           <span className="text-black text-xs">{Math.round(imageScale * 100)}%</span>
         </div>
 
-        {/* --- Pin Press Log Table (Full Screen Only) --- */}
-        {pressedPinsLog.length > 0 && (
-          <div className="fixed top-24 left-1/2 transform -translate-x-1/2 z-60 flex flex-col items-center w-full max-w-xl">
-            <h4 className="text-sm font-semibold mb-2 text-black bg-white bg-opacity-80 rounded px-4 py-2">Pin Press Log:</h4>
-            <table className="w-full text-xs bg-white bg-opacity-90 rounded shadow">
-              <thead>
-                <tr>
-                  <th className="py-1 px-2 text-left">Event</th>
-                </tr>
-              </thead>
-              <tbody>
-                {pressedPinsLog.map((msg, idx) => (
-                  <tr key={idx}>
-                    <td className="py-1 px-2 border-b">{msg}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-
         <button
           onClick={() => setIsFullScreenView(false)}
           className="absolute top-5 right-5 px-4 py-2 bg-red-600 text-white font-bold rounded hover:bg-red-700 z-60 text-sm md:text-base"
         >
           Exit Full Screen
         </button>
-        <div className="flex justify-around items-center w-full max-w-6xl max-h-[95vh]">
+
+        {/* Main content area */}
+        <div className="flex-1 flex justify-around items-center w-full max-w-6xl mx-auto px-4 pt-16">
           {/* Left Pins */}
           <div className={pinSpaceY}>
             {leftPins.map(pin => (
@@ -438,7 +415,7 @@ export default function ICVisualizer({
           </div>
 
           {/* IC Image in Center */}
-          <div className="mx-4 flex items-center justify-center h-auto max-h-[80vh] max-w-[90vw] my-4">
+          <div className="mx-4 flex items-center justify-center h-auto max-h-[60vh] max-w-[90vw] my-4">
             <ICImage partNumber={ic.partNumber} fullScreen scale={imageScale} />
           </div>
 
@@ -468,11 +445,36 @@ export default function ICVisualizer({
             ))}
           </div>
         </div>
+
+        {/* Pin Press Log Table below IC image */}
+  {pressedPinsLog.length > 0 && (
+          <div className="mt-6 flex justify-center">
+            <div className="bg-black bg-opacity-90 rounded-lg p-6 max-h-80 overflow-y-auto w-full max-w-4xl">
+              <h4 className="text-base font-semibold mb-3 text-white text-center">Pin Press Log:</h4>
+              <table className="w-full text-sm text-white">
+                <thead>
+                  <tr className="border-b border-gray-600">
+                    <th className="py-3 px-4 text-left">#</th>
+                    <th className="py-3 px-4 text-left">Event</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {pressedPinsLog.map((msg, idx) => (
+                    <tr key={idx} className="border-b border-gray-700">
+                      <td className="py-2 px-4">{pressedPinsLog.length - idx}</td>
+                      <td className="py-2 px-4">{msg}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
 
-  // --- DEFAULT VIEW (no log table here) ---
+  // --- DEFAULT VIEW (Pin Press Log below IC image) ---
   return (
     <div className="p-4 bg-[var(--background)] rounded-lg shadow w-full">
       <div className="flex justify-between items-center mb-4">
@@ -511,9 +513,8 @@ export default function ICVisualizer({
             </div>
           ))}
         </div>
-
         {/* IC Image in Center */}
-        <div className="mx-4 flex items-center justify-center h-auto max-h-[120px] md:max-h-[150px] my-4">
+        <div className="mx-4 flex flex-col items-center justify-center h-auto max-h-[120px] md:max-h-[150px] my-4 w-full max-w-xs">
           <ICImage partNumber={ic.partNumber} onClick={handleImageClick} />
         </div>
         {/* Right Pins */}
@@ -575,6 +576,9 @@ export default function ICVisualizer({
           </div>
         </div>
       </div>
+
+      {/* Pin Press Log BELOW everything in default view */}
+      {/* Removed - only show in full screen mode */}
 
       {/* Modal for enlarged image */}
       {modalImgSrc && (
