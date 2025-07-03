@@ -1,6 +1,16 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+} from "recharts";
 
 interface Pin {
   pin: number;
@@ -198,6 +208,9 @@ export default function ICVisualizer({
   const [pressedPinsLog, setPressedPinsLog] = useState<string[]>([]);
   const [imageScale, setImageScale] = useState(1);
 
+  // --- Chart state ---
+  const [pinStateHistory, setPinStateHistory] = useState<any[]>([]);
+
   // Helper to reset all pins to false
   const resetAllPins = () => {
     if (!ic) return;
@@ -207,6 +220,7 @@ export default function ICVisualizer({
     });
     setLocalPinStates(newStates);
     onPinStateChange?.(newStates);
+    setPinStateHistory([]);
   };
 
   // Reset pins and image scale when exiting fullscreen or when IC changes
@@ -273,6 +287,16 @@ export default function ICVisualizer({
     };
     setLocalPinStates(newStates);
     onPinStateChange?.(newStates);
+
+    // --- Chart logic: record state of all INPUT pins ---
+    const inputPins = ic.pinConfiguration.filter(p => p.type === "INPUT");
+    const now = new Date();
+    const timeString = now.toLocaleTimeString('en-US', { hour12: false }) + '.' + String(now.getMilliseconds()).padStart(3, '0');
+    const entry: any = { time: timeString };
+    inputPins.forEach(p => {
+      entry[`Pin ${p.pin}`] = newStates[p.pin] ? 1 : 0;
+    });
+    setPinStateHistory(prev => [entry, ...prev].slice(0, 40)); // Keep last 40 events
   };
 
   const getPinColor = (pinType: string, pinNumber: number) => {
@@ -359,6 +383,21 @@ export default function ICVisualizer({
 
   // --- FULL SCREEN VIEW ---
   if (isFullScreenView) {
+    // Prepare chart lines for all input pins
+    const inputPins = ic.pinConfiguration.filter(p => p.type === "INPUT");
+    const chartLines = inputPins.map((p, idx) => (
+      <Line
+        key={p.pin}
+        type="stepAfter"
+        dataKey={`Pin ${p.pin}`}
+        stroke={["#82ca9d", "#ff7300", "#8884d8", "#0088FE", "#FFBB28"][idx % 5]}
+        dot={false}
+        isAnimationActive={false}
+        name={`Pin ${p.pin}`}
+        strokeWidth={2}
+      />
+    ));
+
     return (
       <div className="fixed top-0 left-0 right-0 bottom-0 w-screen h-screen bg-black z-50 flex flex-col">
         {/* Image size slider for user control */}
@@ -446,30 +485,47 @@ export default function ICVisualizer({
           </div>
         </div>
 
-        {/* Pin Press Log Table below IC image */}
-  {pressedPinsLog.length > 0 && (
-          <div className="mt-6 flex justify-center">
-            <div className="bg-black bg-opacity-90 rounded-lg p-6 max-h-80 overflow-y-auto w-full max-w-4xl">
-              <h4 className="text-base font-semibold mb-3 text-white text-center">Pin Press Log:</h4>
-              <table className="w-full text-sm text-white">
-                <thead>
-                  <tr className="border-b border-gray-600">
-                    <th className="py-3 px-4 text-left">#</th>
-                    <th className="py-3 px-4 text-left">Event</th>
+        {/* Pin Press Log Table AND Chart side by side */}
+        <div className="mt-6 flex flex-row justify-center space-x-6 w-full max-w-6xl mx-auto">
+          {/* Pin Press Log Table */}
+          <div className="bg-black bg-opacity-90 rounded-lg p-6 max-h-80 overflow-y-auto w-1/2">
+            <h4 className="text-base font-semibold mb-3 text-white text-center">Pin Press Log:</h4>
+            <table className="w-full text-sm text-white">
+              <thead>
+                <tr className="border-b border-gray-600">
+                  <th className="py-3 px-4 text-left">#</th>
+                  <th className="py-3 px-4 text-left">Event</th>
+                </tr>
+              </thead>
+              <tbody>
+                {pressedPinsLog.map((msg, idx) => (
+                  <tr key={idx} className="border-b border-gray-700">
+                    <td className="py-2 px-4">{pressedPinsLog.length - idx}</td>
+                    <td className="py-2 px-4">{msg}</td>
                   </tr>
-                </thead>
-                <tbody>
-                  {pressedPinsLog.map((msg, idx) => (
-                    <tr key={idx} className="border-b border-gray-700">
-                      <td className="py-2 px-4">{pressedPinsLog.length - idx}</td>
-                      <td className="py-2 px-4">{msg}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                ))}
+              </tbody>
+            </table>
           </div>
-        )}
+
+          {/* Input Pins State Graph */}
+          <div className="bg-black bg-opacity-90 rounded-lg p-6 w-1/2 flex flex-col items-center">
+            <h4 className="text-base font-semibold mb-3 text-white text-center">Input Pins Logic State</h4>
+            <ResponsiveContainer width="100%" height={250}>
+              <LineChart
+                data={[...pinStateHistory].reverse()} // oldest left, newest right
+                margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="time" tick={{ fill: "#fff", fontSize: 12 }} />
+                <YAxis domain={[0, 1]} ticks={[0, 1]} tick={{ fill: "#fff" }} />
+                <Tooltip />
+                <Legend />
+                {chartLines}
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
       </div>
     );
   }
@@ -488,7 +544,6 @@ export default function ICVisualizer({
           Toggle Full Screen
         </button>
       </div>
-
       <div className="flex justify-between items-center">
         {/* Left Pins */}
         <div className="space-y-1">
@@ -576,9 +631,6 @@ export default function ICVisualizer({
           </div>
         </div>
       </div>
-
-      {/* Pin Press Log BELOW everything in default view */}
-      {/* Removed - only show in full screen mode */}
 
       {/* Modal for enlarged image */}
       {modalImgSrc && (
