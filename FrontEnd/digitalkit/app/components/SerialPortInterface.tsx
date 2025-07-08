@@ -1137,6 +1137,13 @@ export default function SerialPortInterface({
             >
               Show Buffer
             </button>
+            <button
+              onClick={() => sendData("CLOCK:PULSE\n")}
+              disabled={!isConnected}
+              className="px-4 py-2 text-sm bg-teal-700 text-teal-100 rounded-md hover:bg-teal-600 dark:bg-teal-900 dark:text-teal-100 dark:hover:bg-teal-800 disabled:opacity-50"
+            >
+              Send CLOCK:PULSE
+            </button>
           </div>
         </div>
 
