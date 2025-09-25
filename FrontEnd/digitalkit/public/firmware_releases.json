@@ -1,0 +1,8 @@
+[
+  {
+    "version": "1.0.0",
+    "date": "2024-06-10",
+    "hex_path": "/releases/arduino_mega_v1_0_0.hex",
+    "changes": "Initial release for Arduino Mega. Basic digital IO support."
+  }
+] 

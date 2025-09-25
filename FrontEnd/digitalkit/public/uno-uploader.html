@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Arduino Uno Firmware Uploader</title>
+  <script src="/arduino-web-uploader.js"></script>
+  <style>
+    body { background: #111; color: #0f0; font-family: sans-serif; }
+    .navbar { width: 100%; background: #18181b; color: #fff; padding: 12px 0; margin-bottom: 32px; box-shadow: 0 2px 8px rgba(0,0,0,0.04); }
+    .navbar-content { max-width: 1200px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; padding: 0 24px; }
+    .navbar-title { font-weight: 700; font-size: 20px; }
+    .navbar-links { display: flex; gap: 16px; }
+    .navbar-link { color: #fff; text-decoration: none; font-size: 16px; }
+    .warning { color: #f00; font-weight: bold; }
+    .note { color: #888; font-size: 12px; margin-top: 32px; }
+    .upload-btn { padding: 8px 24px; font-size: 16px; margin-top: 24px; color: #0f0; background: #222; border: 1px solid #0f0; border-radius: 4px; }
+    .upload-btn:disabled { color: #888; border-color: #888; }
+  </style>
+</head>
+<body>
+  <nav class="navbar">
+    <div class="navbar-content">
+      <div class="navbar-title">Digital Kit</div>
+      <div class="navbar-links">
+        <a href="/" class="navbar-link">Home</a>
+      </div>
+    </div>
+  </nav>
+  <h2>Arduino Uno Firmware Uploader</h2>
+  <div class="warning">
+    Warning: Uploading custom firmware will disable the default Arduino bootloader, hardware button, and onboard LED functionality until you re-upload the original firmware via the Arduino IDE.
+  </div>
+  <p>
+    Select a firmware version to upload to your Arduino Uno using Web Serial.<br>
+    <b>Supported browsers:</b> Chrome, Edge, Opera (desktop only)
+  </p>
+  <button
+    class="upload-btn"
+    arduino-uploader
+    hex-href="/releases/arduino_uno_v1_0_0.hex"
+    board="uno"
+  >
+    Upload Firmware to Arduino Uno
+    <span class="upload-progress" style="margin-left: 12px;"></span>
+  </button>
+  <div class="note">
+    <b>Note:</b> You will lose access to the hardware button and onboard LED after uploading custom firmware.
+  </div>
+</body>
+</html> 
