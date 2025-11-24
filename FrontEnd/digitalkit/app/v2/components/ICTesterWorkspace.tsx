@@ -1,6 +1,13 @@
 "use client";
 
-import { ChangeEvent, useEffect, useMemo, useState } from "react";
+import {
+  ChangeEvent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useICLibrary, ICDefinition } from "../hooks/useICLibrary";
 import {
   DebugLogEntry,
@@ -8,6 +15,7 @@ import {
   StatusFrameSnapshot,
   useSerialProtocol,
 } from "../hooks/useSerialProtocol";
+import { useMQTTBridge } from "../hooks/useMQTTBridge";
 import { PinAssignment, buildAssignments } from "../utils/pinMapping";
 
 const MAX_PINS = 16;
@@ -44,6 +52,63 @@ const normalizeLevel = (value: unknown): 0 | 1 => {
   return 0;
 };
 
+const PinButton = ({
+  assignment,
+  level,
+  disabled,
+  onClick,
+}: {
+  assignment: PinAssignment;
+  level: 0 | 1;
+  disabled: boolean;
+  onClick: () => void;
+}) => {
+  const levelGlow = level
+    ? "border-emerald-400/80 shadow-[0_0_26px_rgba(16,185,129,0.45)]"
+    : "border-slate-700 shadow-[0_0_18px_rgba(148,163,184,0.2)]";
+  const levelGradient = level
+    ? "bg-gradient-to-b from-emerald-500/25 via-emerald-600/10 to-gray-900"
+    : "bg-gradient-to-b from-slate-900 via-gray-950 to-black";
+  const levelBadge = level
+    ? "bg-emerald-500/20 text-emerald-200 border border-emerald-400/40"
+    : "bg-slate-800 text-slate-200 border border-slate-600/80";
+
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={onClick}
+      className={`flex flex-col items-center justify-center rounded-2xl border px-4 py-5 text-xs transition duration-200 ${levelGlow} ${levelGradient} ${
+        disabled ? "opacity-55 cursor-not-allowed" : "hover:-translate-y-0.5"
+      }`}
+    >
+      <span className="text-[11px] uppercase tracking-[0.35em] text-gray-400">
+        Pin {assignment.icPin}
+      </span>
+      <span className="mt-1 text-base font-semibold text-white">
+        {assignment.name}
+      </span>
+      <div className="mt-2 flex flex-wrap items-center justify-center gap-2 text-[11px] font-semibold uppercase tracking-wide">
+        <span
+          className={`rounded-full px-2 py-0.5 text-white ${ROLE_COLORS[assignment.role]}`}
+        >
+          {ROLE_LABELS[assignment.role]}
+        </span>
+        <span className={`rounded-full px-2 py-0.5 ${levelBadge}`}>
+          {level ? "HIGH" : "LOW"}
+        </span>
+      </div>
+      <div
+        className={`mt-3 h-1.5 w-full rounded-full bg-gray-800/70 transition-colors ${
+          level
+            ? "bg-gradient-to-r from-emerald-400 via-emerald-500 to-emerald-600"
+            : "bg-gradient-to-r from-slate-700 via-slate-800 to-gray-900"
+        }`}
+      />
+    </button>
+  );
+};
+
 const formatTimestamp = (entry: DebugLogEntry) =>
   new Date(entry.timestamp).toLocaleTimeString();
 
@@ -52,6 +117,28 @@ type PinStateMap = Partial<Record<number, 0 | 1>>;
 type PinNameMap = Record<string, number>;
 
 type VirtualLookup = Record<number, PinAssignment>;
+
+type PinStateOrigin = "serial" | "local" | "truth" | "mqtt";
+
+const DEFAULT_BASE_TOPIC = "digitalkit/pins";
+const MQTT_ECHO_WINDOW_MS = 800;
+const MQTT_INPUT_BUFFER_MS = 300;
+
+const sanitizeTopicBase = (value: string) => {
+  const trimmed = (value ?? "").trim();
+  if (!trimmed) return DEFAULT_BASE_TOPIC;
+  return trimmed.replace(/\/{2,}/g, "/").replace(/^\/+|\/+$/g, "");
+};
+
+const buildPinTopic = (base: string, pin: number) => {
+  const root = sanitizeTopicBase(base);
+  return `${root}/pin/${pin}`;
+};
+
+const buildMetadataTopic = (base: string) => {
+  const root = sanitizeTopicBase(base);
+  return `${root}/icName`;
+};
 
 const buildVirtualLookup = (assignments: PinAssignment[]): VirtualLookup => {
   return assignments.reduce<VirtualLookup>((acc, assignment) => {
@@ -188,35 +275,6 @@ const useICPictures = (ic: ICDefinition | null) => {
   return src;
 };
 
-const PinButton = ({
-  assignment,
-  level,
-  disabled,
-  onClick,
-}: {
-  assignment: PinAssignment;
-  level: 0 | 1;
-  disabled: boolean;
-  onClick: () => void;
-}) => {
-  return (
-    <button
-      type="button"
-      disabled={disabled}
-      onClick={onClick}
-      className={`flex flex-col items-center justify-center rounded-md border border-gray-600 px-2 py-3 text-xs transition
-        ${ROLE_COLORS[assignment.role]} ${
-        disabled ? "opacity-60 cursor-not-allowed" : "hover:border-white"
-      }`}
-    >
-      <span className="text-sm font-semibold">Pin {assignment.icPin}</span>
-      <span className="text-white font-bold">{assignment.name}</span>
-      <span className="text-gray-200">{ROLE_LABELS[assignment.role]}</span>
-      <span className="mt-1 text-xs font-mono">{level ? "HIGH" : "LOW"}</span>
-    </button>
-  );
-};
-
 const LogPanel = ({ logs }: { logs: DebugLogEntry[] }) => (
   <div className="h-72 overflow-y-auto rounded-md border border-gray-700 bg-black/40 p-3 text-xs font-mono">
     {logs.length === 0 ? (
@@ -320,6 +378,147 @@ const TruthTable = ({
           ))}
         </tbody>
       </table>
+    </div>
+  );
+};
+
+const PinFullscreenOverlay = ({
+  ic,
+  assignments,
+  pinStates,
+  isConnected,
+  onTogglePin,
+  onClose,
+}: {
+  ic: ICDefinition;
+  assignments: PinAssignment[];
+  pinStates: PinStateMap;
+  isConnected: boolean;
+  onTogglePin: (assignment: PinAssignment) => void | Promise<void>;
+  onClose: () => void;
+}) => {
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const handleKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        onClose();
+      }
+    };
+    document.addEventListener("keydown", handleKey);
+    return () => {
+      document.body.style.overflow = originalOverflow;
+      document.removeEventListener("keydown", handleKey);
+    };
+  }, [onClose]);
+
+  return (
+    <div className="fixed inset-0 z-50 flex flex-col bg-gradient-to-b from-gray-950 via-black to-gray-950 text-white">
+      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-white/10 px-6 py-4">
+        <div>
+          <p className="text-xs uppercase tracking-[0.35em] text-gray-500">
+            Fullscreen Pinboard
+          </p>
+          <p className="text-2xl font-semibold text-white">{ic.partNumber}</p>
+          <p className="text-sm text-gray-400">
+            {ic.pinCount}-pin • {ic.category}
+          </p>
+        </div>
+        <div className="flex items-center gap-3 text-sm text-gray-300">
+          <span
+            className={isConnected ? "text-emerald-300" : "text-orange-300"}
+          >
+            {isConnected ? "Serial link active" : "Serial link idle"}
+          </span>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded border border-gray-600 px-3 py-1 text-sm font-semibold text-gray-200 hover:bg-gray-800"
+          >
+            Exit
+          </button>
+        </div>
+      </div>
+      <div className="flex-1 overflow-y-auto px-6 py-6">
+        <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+          {assignments.map((assignment) => {
+            const level = (pinStates[assignment.icPin] ?? 0) as 0 | 1;
+            const canDrive = isConnected && [1, 5].includes(assignment.role);
+            const levelGlow = level
+              ? "border-emerald-400/80 shadow-[0_0_45px_rgba(16,185,129,0.45)]"
+              : "border-slate-800 shadow-[0_0_28px_rgba(15,23,42,0.6)]";
+            const levelGradient = level
+              ? "bg-gradient-to-br from-emerald-500/20 via-emerald-600/10 to-gray-900"
+              : "bg-gradient-to-br from-slate-900 via-black to-gray-950";
+            const levelBadge = level
+              ? "bg-emerald-500/15 text-emerald-200 border border-emerald-400/50"
+              : "bg-slate-800/70 text-slate-200 border border-slate-600";
+            const driveBadge = canDrive
+              ? "border-emerald-400/50 text-emerald-200"
+              : "border-amber-400/50 text-amber-200";
+            return (
+              <button
+                key={assignment.icPin}
+                type="button"
+                onClick={() => onTogglePin(assignment)}
+                disabled={!canDrive}
+                className={`group relative flex h-full flex-col gap-3 rounded-3xl border px-5 py-6 text-left transition ${levelGlow} ${levelGradient} ${
+                  canDrive
+                    ? "hover:-translate-y-1 hover:border-white/70"
+                    : "cursor-not-allowed opacity-60"
+                }`}
+              >
+                <div className="flex items-center justify-between text-[10px] uppercase tracking-[0.35em] text-gray-400">
+                  <span>Pin {assignment.icPin}</span>
+                  <span className="text-gray-500">
+                    V{assignment.virtualIndex.toString().padStart(2, "0")}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-2xl font-semibold text-white">
+                    {assignment.name}
+                  </p>
+                  <span className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide ${levelBadge}`}>
+                    {level ? "HIGH" : "LOW"}
+                  </span>
+                </div>
+                <div className="flex flex-wrap items-center gap-2 text-[11px] font-semibold uppercase tracking-wide">
+                  <span
+                    className={`rounded-full px-2 py-0.5 text-white ${ROLE_COLORS[assignment.role]}`}
+                  >
+                    {ROLE_LABELS[assignment.role]}
+                  </span>
+                  <span className={`rounded-full border px-2 py-0.5 ${driveBadge}`}>
+                    {canDrive ? "Drive capable" : "Sense only"}
+                  </span>
+                </div>
+                <p className="text-[11px] text-gray-400">
+                  {level ? "Signal asserted via board" : "Signal idle"}
+                </p>
+                <div
+                  className={`mt-1 h-1.5 w-full rounded-full bg-white/10 transition-all ${
+                    level
+                      ? "bg-gradient-to-r from-emerald-400 via-emerald-500 to-emerald-600"
+                      : "bg-gradient-to-r from-slate-700 via-slate-800 to-gray-900"
+                  }`}
+                />
+              </button>
+            );
+          })}
+        </div>
+        <div className="mt-6 rounded-2xl border border-white/10 bg-white/5 p-4 text-xs text-gray-200">
+          <p className="text-sm font-semibold text-white">Legend</p>
+          <div className="mt-3">
+            <PinLegend />
+          </div>
+          <p className="mt-3 text-[11px] text-gray-400">
+            Only pins configured as Drive or Clock can be toggled while
+            connected. Press Esc or the Exit button to leave fullscreen mode.
+          </p>
+        </div>
+      </div>
     </div>
   );
 };
@@ -476,11 +675,62 @@ const ICTesterWorkspace = () => {
   const [datasheetZoom, setDatasheetZoom] = useState(1);
   const [isImageModalOpen, setImageModalOpen] = useState(false);
   const [imageModalZoom, setImageModalZoom] = useState(1);
+  const [isPinFullscreen, setPinFullscreen] = useState(false);
+  const [baseTopic, setBaseTopic] = useState(DEFAULT_BASE_TOPIC);
+  const mqttDecoder = useMemo(() => new TextDecoder(), []);
+
+  const {
+    brokerUrl,
+    setBrokerUrl,
+    isEnabled: mqttEnabled,
+    setEnabled: setMqttEnabled,
+    status: mqttStatus,
+    error: mqttError,
+    lastMessage: mqttLastMessage,
+    clientId,
+    publish: publishMQTT,
+    replaceSubscriptions,
+  } = useMQTTBridge();
+
+  const pinOriginsRef = useRef<Record<number, PinStateOrigin>>({});
+  const prevPinStatesRef = useRef<PinStateMap>({});
+  const lastPublishedRef = useRef<
+    Record<string, { payload: string; timestamp: number }>
+  >({});
+  const lastMetadataPayloadRef = useRef<string | null>(null);
+  const mqttInputGateRef = useRef<Record<number, number>>({});
 
   const assignments = useMemo(() => buildAssignments(selectedIC), [selectedIC]);
   const virtualLookup = useMemo(
     () => buildVirtualLookup(assignments),
     [assignments]
+  );
+  const assignmentByPin = useMemo(() => {
+    const map: Record<number, PinAssignment> = {};
+    assignments.forEach((assignment) => {
+      map[assignment.icPin] = assignment;
+    });
+    return map;
+  }, [assignments]);
+
+  const mqttTopicMap = useMemo(() => {
+    if (!selectedIC) {
+      return { topics: [], pinToTopic: {}, topicToPin: {} };
+    }
+    const pinToTopic: Record<number, string> = {};
+    const topicToPin: Record<string, number> = {};
+    const topics: string[] = [];
+    assignments.forEach((assignment) => {
+      const topic = buildPinTopic(baseTopic, assignment.icPin);
+      pinToTopic[assignment.icPin] = topic;
+      topicToPin[topic] = assignment.icPin;
+      topics.push(topic);
+    });
+    return { topics, pinToTopic, topicToPin };
+  }, [assignments, baseTopic, selectedIC]);
+  const metadataTopic = useMemo(
+    () => buildMetadataTopic(baseTopic),
+    [baseTopic]
   );
 
   const virtualRoles = useMemo<RoleCode[]>(() => {
@@ -491,19 +741,26 @@ const ICTesterWorkspace = () => {
     return roles;
   }, [assignments]);
 
+  const setPinLevel = useCallback(
+    (pinNumber: number, level: 0 | 1, origin: PinStateOrigin) => {
+      setPinStates((prev) => {
+        if (prev[pinNumber] === level) return prev;
+        pinOriginsRef.current[pinNumber] = origin;
+        return { ...prev, [pinNumber]: level };
+      });
+    },
+    []
+  );
+
   useEffect(() => {
     if (!statusFrame || !selectedIC) return;
-    setPinStates((prev) => {
-      const next = { ...prev };
-      statusFrame.pins.forEach((pin) => {
-        const assignment = virtualLookup[pin.virtualIndex];
-        if (assignment) {
-          next[assignment.icPin] = pin.level;
-        }
-      });
-      return next;
+    statusFrame.pins.forEach((pin) => {
+      const assignment = virtualLookup[pin.virtualIndex];
+      if (assignment) {
+        setPinLevel(assignment.icPin, pin.level as 0 | 1, "serial");
+      }
     });
-  }, [statusFrame, virtualLookup, selectedIC]);
+  }, [selectedIC, setPinLevel, statusFrame, virtualLookup]);
 
   useEffect(() => {
     setDatasheetModalOpen(false);
@@ -511,6 +768,38 @@ const ICTesterWorkspace = () => {
     setDatasheetZoom(1);
     setImageModalZoom(1);
   }, [selectedIC]);
+
+  useEffect(() => {
+    setPinStates({});
+    pinOriginsRef.current = {};
+    prevPinStatesRef.current = {};
+    lastPublishedRef.current = {};
+    mqttInputGateRef.current = {};
+    setPinFullscreen(false);
+  }, [selectedIC]);
+
+  useEffect(() => {
+    lastPublishedRef.current = {};
+    lastMetadataPayloadRef.current = null;
+    mqttInputGateRef.current = {};
+  }, [baseTopic]);
+
+  useEffect(() => {
+    if (!mqttEnabled) {
+      lastMetadataPayloadRef.current = null;
+      mqttInputGateRef.current = {};
+    }
+  }, [mqttEnabled]);
+
+  const shouldDropMqttUpdate = useCallback((pinNumber: number) => {
+    const now = Date.now();
+    const gate = mqttInputGateRef.current[pinNumber] ?? 0;
+    if (now < gate) {
+      return true;
+    }
+    mqttInputGateRef.current[pinNumber] = now + MQTT_INPUT_BUFFER_MS;
+    return false;
+  }, []);
 
   useEffect(() => {
     if (!isConnected || !selectedIC) return;
@@ -557,7 +846,7 @@ const ICTesterWorkspace = () => {
     if (!isConnected) return;
     if (![1, 5].includes(assignment.role)) return;
     const nextLevel = (pinStates[assignment.icPin] ?? 0 ? 0 : 1) as 0 | 1;
-    setPinStates((prev) => ({ ...prev, [assignment.icPin]: nextLevel }));
+    setPinLevel(assignment.icPin, nextLevel, "local");
     try {
       await sendSetLevel(assignment.virtualIndex, nextLevel);
     } catch (err) {
@@ -593,9 +882,139 @@ const ICTesterWorkspace = () => {
       const assignment = assignments.find((item) => item.icPin === pinNumber);
       if (!assignment || ![1, 5].includes(assignment.role)) continue;
       await sendSetLevel(assignment.virtualIndex, input.level);
-      setPinStates((prev) => ({ ...prev, [pinNumber]: input.level }));
+      setPinLevel(pinNumber, input.level as 0 | 1, "truth");
     }
   };
+
+  const publishPinLevel = useCallback(
+    (pinNumber: number, level: 0 | 1) => {
+      if (!mqttEnabled) return;
+      const topic = mqttTopicMap.pinToTopic[pinNumber];
+      if (!topic) return;
+      const payload = `${level}`;
+      lastPublishedRef.current[topic] = {
+        payload,
+        timestamp: Date.now(),
+      };
+      publishMQTT(topic, payload);
+    },
+    [mqttEnabled, mqttTopicMap, publishMQTT]
+  );
+
+  useEffect(() => {
+    const prev = prevPinStatesRef.current;
+    const changed: Array<{ pin: number; level: 0 | 1 }> = [];
+    const pins = new Set([...Object.keys(prev), ...Object.keys(pinStates)]);
+    pins.forEach((key) => {
+      const pin = Number(key);
+      const nextLevel = pinStates[pin];
+      const prevLevel = prev[pin];
+      if (typeof nextLevel === "undefined" || prevLevel === nextLevel) {
+        return;
+      }
+      changed.push({ pin, level: nextLevel as 0 | 1 });
+    });
+    prevPinStatesRef.current = pinStates;
+    if (!changed.length) return;
+    changed.forEach(({ pin, level }) => {
+      const origin = pinOriginsRef.current[pin];
+      delete pinOriginsRef.current[pin];
+      if (origin === "mqtt") return;
+      publishPinLevel(pin, level);
+    });
+  }, [pinStates, publishPinLevel]);
+
+  useEffect(() => {
+    if (!mqttEnabled || !selectedIC) return;
+    const payload = JSON.stringify({
+      partNumber: selectedIC.partNumber,
+      description: selectedIC.description,
+      pinCount: selectedIC.pinCount,
+      category: selectedIC.category,
+    });
+    if (lastMetadataPayloadRef.current === payload) return;
+    lastMetadataPayloadRef.current = payload;
+    publishMQTT(metadataTopic, payload);
+  }, [metadataTopic, mqttEnabled, publishMQTT, selectedIC]);
+
+  const handleMqttPayload = useCallback(
+    async (topic: string, rawPayload: Uint8Array) => {
+      if (!mqttEnabled) return;
+      const pinNumber = mqttTopicMap.topicToPin[topic];
+      if (!pinNumber) return;
+      const text = mqttDecoder.decode(rawPayload).trim();
+      let derived: 0 | 1 | null = null;
+      if (text.startsWith("{")) {
+        try {
+          const parsed = JSON.parse(text) as Record<string, unknown>;
+          if (
+            "level" in parsed &&
+            parsed.level !== undefined &&
+            parsed.level !== null
+          ) {
+            derived = normalizeLevel(parsed.level);
+          }
+        } catch {
+          // ignore malformed JSON payloads
+        }
+      }
+      if (derived === null && text.length) {
+        const lowered = text.toLowerCase();
+        if (lowered === "1" || lowered === "high") derived = 1;
+        else if (lowered === "0" || lowered === "low") derived = 0;
+      }
+      if (derived === null) return;
+
+      const echo = lastPublishedRef.current[topic];
+      if (
+        echo &&
+        echo.payload === `${derived}` &&
+        Date.now() - echo.timestamp < MQTT_ECHO_WINDOW_MS
+      ) {
+        return;
+      }
+
+      if (shouldDropMqttUpdate(pinNumber)) {
+        return;
+      }
+
+      setPinLevel(pinNumber, derived, "mqtt");
+      if (isConnected) {
+        const assignment = assignmentByPin[pinNumber];
+        if (assignment && [1, 5].includes(assignment.role)) {
+          try {
+            await sendSetLevel(assignment.virtualIndex, derived);
+          } catch (err) {
+            console.error("Failed to drive pin from MQTT", err);
+          }
+        }
+      }
+    },
+    [
+      assignmentByPin,
+      isConnected,
+      mqttDecoder,
+      mqttEnabled,
+      mqttTopicMap,
+      shouldDropMqttUpdate,
+      sendSetLevel,
+      setPinLevel,
+    ]
+  );
+
+  useEffect(() => {
+    if (!mqttEnabled || !selectedIC || mqttTopicMap.topics.length === 0) {
+      replaceSubscriptions([], null);
+      return;
+    }
+    replaceSubscriptions(mqttTopicMap.topics, handleMqttPayload);
+  }, [
+    handleMqttPayload,
+    mqttEnabled,
+    mqttTopicMap,
+    replaceSubscriptions,
+    selectedIC,
+  ]);
 
   const statusSummary = (frame: StatusFrameSnapshot | null) => {
     if (!frame) return "No status";
@@ -605,6 +1024,19 @@ const ICTesterWorkspace = () => {
 
   const datasheetUrl = selectedIC ? resolveDatasheetUrl(selectedIC) : null;
   const icImageSrc = useICPictures(selectedIC);
+  const mqttStatusLabel = mqttEnabled ? mqttStatus : "disabled";
+  const mqttLastMessageText = mqttLastMessage
+    ? `${new Date(mqttLastMessage.timestamp).toLocaleTimeString()} • ${
+        mqttLastMessage.topic
+      }`
+    : "None";
+  const mqttExampleTopic = useMemo(() => {
+    if (mqttTopicMap.topics.length) {
+      return mqttTopicMap.topics[0];
+    }
+    const fallbackPin = selectedIC?.pinConfiguration?.[0]?.pin ?? 1;
+    return buildPinTopic(baseTopic, fallbackPin);
+  }, [baseTopic, mqttTopicMap, selectedIC]);
 
   const openDatasheet = () => {
     if (datasheetUrl) window.open(datasheetUrl, "_blank");
@@ -777,6 +1209,90 @@ const ICTesterWorkspace = () => {
         </section>
 
         <section className="rounded-lg border border-gray-700 bg-gray-900/50 p-5">
+          <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+            <div>
+              <h2 className="text-xl font-semibold text-white">MQTT Bridge</h2>
+              <p className="text-sm text-gray-400">
+                Mirror pin levels directly to your MQTT broker and accept remote
+                overrides in real time.
+              </p>
+            </div>
+            <label className="flex items-center gap-2 text-sm text-gray-200">
+              <input
+                type="checkbox"
+                checked={mqttEnabled}
+                onChange={(event) => setMqttEnabled(event.target.checked)}
+                disabled={!selectedIC}
+              />
+              Enable bridge
+              {!selectedIC && (
+                <span className="text-xs text-gray-500">
+                  Select an IC first
+                </span>
+              )}
+            </label>
+          </div>
+          <div className="mt-4 grid gap-4 md:grid-cols-2">
+            <div className="space-y-3">
+              <div>
+                <label className="text-sm text-gray-300">
+                  MQTT WebSocket URL
+                </label>
+                <input
+                  type="text"
+                  className="mt-1 w-full rounded border border-gray-600 bg-gray-800 p-2 text-sm text-white"
+                  value={brokerUrl}
+                  onChange={(event) => setBrokerUrl(event.target.value)}
+                  placeholder="ws://localhost:9001/mqtt"
+                />
+                <p className="mt-1 text-xs text-gray-500">
+                  Enter the secure WebSocket endpoint exposed by your Mosquitto
+                  (or compatible) broker.
+                </p>
+              </div>
+              <div>
+                <label className="text-sm text-gray-300">Base Topic</label>
+                <input
+                  type="text"
+                  className="mt-1 w-full rounded border border-gray-600 bg-gray-800 p-2 text-sm text-white"
+                  value={baseTopic}
+                  onChange={(event) => setBaseTopic(event.target.value)}
+                />
+                <p className="mt-1 text-xs text-gray-500">
+                  Example pin topic:{" "}
+                  <span className="font-mono text-gray-300">
+                    {mqttExampleTopic}
+                  </span>
+                </p>
+                <p className="text-xs text-gray-500">
+                  Metadata topic:{" "}
+                  <span className="font-mono text-gray-300">
+                    {metadataTopic}
+                  </span>
+                </p>
+              </div>
+            </div>
+            <div className="space-y-1 text-sm text-gray-300">
+              <p>
+                Status:{" "}
+                <span className="font-semibold text-white">
+                  {mqttStatusLabel}
+                </span>
+              </p>
+              <p>
+                Client:{" "}
+                <span className="font-mono text-gray-400">{clientId}</span>
+              </p>
+              <p>Subscriptions: {mqttTopicMap.topics.length}</p>
+              <p>Last message: {mqttLastMessageText}</p>
+              {mqttError && (
+                <p className="text-xs text-red-400">Error: {mqttError}</p>
+              )}
+            </div>
+          </div>
+        </section>
+
+        <section className="rounded-lg border border-gray-700 bg-gray-900/50 p-5">
           <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
             <div>
               <h2 className="text-xl font-semibold text-white">IC Library</h2>
@@ -844,24 +1360,33 @@ const ICTesterWorkspace = () => {
                 </p>
               </div>
               <div className="flex flex-col items-end gap-2 text-right md:flex-row md:items-center md:text-left">
-                {datasheetUrl && (
-                  <div className="flex flex-wrap items-center justify-end gap-2">
-                    <button
-                      type="button"
-                      onClick={openDatasheet}
-                      className="rounded border border-amber-500 px-3 py-1 text-xs font-semibold text-amber-200 hover:bg-amber-500/10"
-                    >
-                      Open Datasheet
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setDatasheetModalOpen(true)}
-                      className="rounded border border-blue-500 px-3 py-1 text-xs font-semibold text-blue-200 hover:bg-blue-500/10"
-                    >
-                      Preview
-                    </button>
-                  </div>
-                )}
+                <div className="flex flex-wrap items-center justify-end gap-2">
+                  {datasheetUrl && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={openDatasheet}
+                        className="rounded border border-amber-500 px-3 py-1 text-xs font-semibold text-amber-200 hover:bg-amber-500/10"
+                      >
+                        Open Datasheet
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setDatasheetModalOpen(true)}
+                        className="rounded border border-blue-500 px-3 py-1 text-xs font-semibold text-blue-200 hover:bg-blue-500/10"
+                      >
+                        Preview
+                      </button>
+                    </>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setPinFullscreen(true)}
+                    className="rounded border border-fuchsia-500 px-3 py-1 text-xs font-semibold text-fuchsia-200 hover:bg-fuchsia-500/10"
+                  >
+                    Pin Fullscreen
+                  </button>
+                </div>
                 <PinLegend />
               </div>
             </div>
@@ -963,6 +1488,16 @@ const ICTesterWorkspace = () => {
           </div>
         </section>
       </div>
+      {isPinFullscreen && selectedIC && (
+        <PinFullscreenOverlay
+          ic={selectedIC}
+          assignments={assignments}
+          pinStates={pinStates}
+          isConnected={isConnected}
+          onTogglePin={handlePinToggle}
+          onClose={() => setPinFullscreen(false)}
+        />
+      )}
       {isDatasheetModalOpen && datasheetUrl && (
         <DatasheetModal
           url={datasheetUrl}
