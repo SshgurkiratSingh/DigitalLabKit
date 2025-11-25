@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { ICData } from "../types/ICTypes";
 import ICSelector from "./ICSelector";
 import ICVisualizer from "./ICVisualizer";
@@ -34,7 +34,6 @@ export default function BLEInterface({ onICSelect: parentOnICSelect }: BLEInterf
     }>
   >([]);
   const [showDebugLog, setShowDebugLog] = useState(true); // For debug log visibility
-  const [allICs, setAllICs] = useState<ICData[]>([]); // Store all loaded ICs
 
   const characteristicsRef = useRef<{
     ic?: BluetoothRemoteGATTCharacteristic;
@@ -43,11 +42,19 @@ export default function BLEInterface({ onICSelect: parentOnICSelect }: BLEInterf
     status?: BluetoothRemoteGATTCharacteristic;
   }>({});
 
-  const isBLESupported = typeof navigator !== 'undefined' && 'bluetooth' in navigator;
+  const deviceRef = useRef<BLEDevice | null>(null);
+  const isBLESupported = typeof navigator !== "undefined" && "bluetooth" in navigator;
 
-  const addLogEntry = (type: "received" | "sent" | "info" | "error" | "warning", message: string) => {
-    setDebugLogs(prev => [...prev, { timestamp: new Date().toISOString(), type, message }]);
-  };
+  const addLogEntry = useCallback(
+    (type: "received" | "sent" | "info" | "error" | "warning", message: string) => {
+      setDebugLogs((prev) => [...prev, { timestamp: new Date().toISOString(), type, message }]);
+    },
+    []
+  );
+
+  useEffect(() => {
+    deviceRef.current = device;
+  }, [device]);
 
   // Request BLE device
   const requestDevice = async () => {
@@ -62,9 +69,10 @@ export default function BLEInterface({ onICSelect: parentOnICSelect }: BLEInterf
         filters: [{ services: [SERVICE_UUID] }],
       });
       setDevice(bleDevice);
+      deviceRef.current = bleDevice;
       setError(null);
       addLogEntry("info", `Device selected: ${bleDevice.name || bleDevice.id}`);
-      bleDevice.addEventListener('gattserverdisconnected', handleDisconnectionEvent);
+      bleDevice.addEventListener("gattserverdisconnected", handleDisconnectionEvent);
       return bleDevice;
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -75,14 +83,18 @@ export default function BLEInterface({ onICSelect: parentOnICSelect }: BLEInterf
   };
 
   // Handle device disconnection event
-  const handleDisconnectionEvent = () => {
-    addLogEntry("info", `Device ${device?.name || device?.id} disconnected.`);
+  const handleDisconnectionEvent = useCallback(() => {
+    const activeDevice = deviceRef.current;
+    addLogEntry(
+      "info",
+      `Device ${activeDevice?.name || activeDevice?.id || "unknown"} disconnected.`
+    );
     setIsConnected(false);
     characteristicsRef.current = {};
     // Optionally clear selectedIC and pinStates
     // setSelectedIC(null);
     // setPinStates({});
-  };
+  }, [addLogEntry]);
 
   // Connect to device
   const connectToDevice = async () => {
@@ -255,15 +267,7 @@ export default function BLEInterface({ onICSelect: parentOnICSelect }: BLEInterf
       if (pinStateStr.length !== pinCount) {
         addLogEntry("error", `Pin string length mismatch: Expected ${pinCount}, got ${pinStateStr.length}. Aborting send.`);
         // Revert optimistic update if this error occurs
-        setPinStates(prev => {
-            const reverted = {...prev};
-            // Simple revert for this example, might need more complex logic
-            Object.keys(newPinStatesToSet).forEach(pinKey => {
-                // This is a naive revert, assumes previous state was in `pinStates`
-                // A better approach might be to store the state before optimistic update
-            });
-            return reverted; // This part needs careful implementation for true revert
-        });
+        setPinStates((prev) => ({ ...prev }));
         return;
       }
 
@@ -300,46 +304,6 @@ export default function BLEInterface({ onICSelect: parentOnICSelect }: BLEInterf
     }
   };
 
-  // Load IC data from JSON files
-  useEffect(() => {
-    const loadICData = async () => {
-      addLogEntry("info", "Loading IC data...");
-      try {
-        const icFiles = [
-          "BCDDecoderIC.json", "CounterIC.json", "ShiftRegisterIC.json",
-          "arithmeticIc.json", "combinationalIC.json", "comparatorIc.json",
-          "sequentialIC.json",
-        ];
-        const loadedICs: ICData[] = [];
-        for (const file of icFiles) {
-          const response = await fetch(`/files/${file}`);
-          if (!response.ok) throw new Error(`Failed to load ${file}: ${response.statusText}`);
-          const data = await response.json();
-          Object.values(data).forEach((series: any) => {
-            if (series && typeof series === 'object') {
-              Object.values(series).forEach((category: any) => {
-                if (category && typeof category === 'object') {
-                  Object.values(category).forEach((ic: any) => {
-                    if (ic && ic.partNumber && ic.pinConfiguration) { // Basic validation
-                      loadedICs.push(ic as ICData);
-                    }
-                  });
-                }
-              });
-            }
-          });
-        }
-        setAllICs(loadedICs);
-        addLogEntry("info", `Successfully loaded ${loadedICs.length} ICs.`);
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : "Unknown error";
-        addLogEntry("error", `Failed to load IC data: ${msg}.`);
-        setError(`Failed to load IC data: ${msg}`);
-      }
-    };
-    loadICData();
-  }, []);
-
   // Cleanup on unmount
   useEffect(() => {
     const dev = device; // Capture current device for cleanup
@@ -351,10 +315,18 @@ export default function BLEInterface({ onICSelect: parentOnICSelect }: BLEInterf
           // Try to stop notifications gracefully
           const stopNotifications = async () => {
             if (characteristicsRef.current.pins?.properties.notify) {
-              try { await characteristicsRef.current.pins.stopNotifications(); } catch (e) { /* ignore */ }
+              try {
+                await characteristicsRef.current.pins.stopNotifications();
+              } catch {
+                /* ignore */
+              }
             }
             if (characteristicsRef.current.status?.properties.notify) {
-              try { await characteristicsRef.current.status.stopNotifications(); } catch (e) { /* ignore */ }
+              try {
+                await characteristicsRef.current.status.stopNotifications();
+              } catch {
+                /* ignore */
+              }
             }
           };
           stopNotifications().finally(() => {
@@ -364,7 +336,7 @@ export default function BLEInterface({ onICSelect: parentOnICSelect }: BLEInterf
         }
       }
     };
-  }, [device]); // Re-run if device instance changes
+  }, [device, handleDisconnectionEvent, addLogEntry]); // Re-run if device instance changes
 
   if (!isBLESupported) {
     return (

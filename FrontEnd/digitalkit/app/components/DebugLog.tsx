@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 
 interface LogEntry {
   timestamp: string;
@@ -11,12 +11,6 @@ interface LogEntry {
 export default function DebugLog() {
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [filter, setFilter] = useState<"all" | "received" | "sent" | "info" | "error">("all");
-
-  // Add a new log entry
-  const addLog = (type: LogEntry["type"], message: string) => {
-    const timestamp = new Date().toISOString();
-    setLogs(prev => [...prev, { timestamp, type, message }]);
-  };
 
   // Clear all logs
   const clearLogs = () => {

@@ -214,89 +214,6 @@ export function useSerialProtocol(): SerialProtocolHook {
     disconnectingRef.current = false;
   }, [selectedPort]);
 
-  const connect = useCallback(async () => {
-    if (!selectedPort) throw new Error("No port selected");
-    setIsConnecting(true);
-    try {
-      await selectedPort.port.open({ baudRate: 115200 });
-      if (selectedPort.port.writable) {
-        writerRef.current = selectedPort.port.writable.getWriter();
-      }
-      if (selectedPort.port.readable) {
-        readerRef.current = selectedPort.port.readable.getReader();
-        readLoop();
-      }
-      setIsConnected(true);
-      setLogs((prev) =>
-        appendLog(prev, { type: "info", message: "Connected to serial node" })
-      );
-    } catch (err) {
-      setLogs((prev) =>
-        appendLog(prev, {
-          type: "error",
-          message: `Failed to connect: ${err}`,
-        })
-      );
-      await closePort();
-      throw err;
-    } finally {
-      setIsConnecting(false);
-    }
-  }, [selectedPort, closePort]);
-
-  const disconnect = useCallback(async () => {
-    await closePort();
-    setIsConnected(false);
-    setLogs((prev) => appendLog(prev, { type: "info", message: "Disconnected" }));
-  }, [closePort]);
-
-  const writeFrame = useCallback(async (cmd: number, payload: number[] = []) => {
-    if (!writerRef.current) throw new Error("Writer unavailable");
-    const frame = buildFrame(cmd, payload);
-    await writerRef.current.write(frame);
-    setLogs((prev) => appendLog(prev, { type: "sent", message: `CMD 0x${cmd.toString(16)} => ${Array.from(frame).map((b) => b.toString(16).padStart(2, "0")).join(" ")}` }));
-  }, []);
-
-  const sendSetRole = useCallback(
-    async (virtualIndex: number, role: RoleCode) => {
-      await writeFrame(CMD.SET_ROLE, [virtualIndex, role]);
-    },
-    [writeFrame]
-  );
-
-  const sendSetLevel = useCallback(
-    async (virtualIndex: number, level: 0 | 1) => {
-      await writeFrame(CMD.SET_LEVEL, [virtualIndex, level]);
-    },
-    [writeFrame]
-  );
-
-  const sendClkConfig = useCallback(
-    async (onMs: number, offMs: number) => {
-      const onL = onMs & 0xff;
-      const onH = (onMs >> 8) & 0xff;
-      const offL = offMs & 0xff;
-      const offH = (offMs >> 8) & 0xff;
-      await writeFrame(CMD.CLK_CONFIG, [onL, onH, offL, offH]);
-    },
-    [writeFrame]
-  );
-
-  const sendClkEnable = useCallback(
-    async (enable: boolean) => {
-      await writeFrame(CMD.CLK_ENABLE, [enable ? 1 : 0]);
-    },
-    [writeFrame]
-  );
-
-  const sendReset = useCallback(async () => {
-    await writeFrame(CMD.RESET);
-  }, [writeFrame]);
-
-  const requestStatus = useCallback(async () => {
-    await writeFrame(CMD.STATUS_REQUEST);
-  }, [writeFrame]);
-
   const handleAck = useCallback((payload: Uint8Array) => {
     if (payload.length < 2) return;
     const frame: AckFrame = { refCmd: payload[0], status: payload[1] };
@@ -312,7 +229,7 @@ export function useSerialProtocol(): SerialProtocolHook {
     if (payload.length < 17) return;
     const timeLow = payload[0];
     const pins: StatusPinSnapshot[] = [];
-    for (let i = 1; i <= 16; i++) {
+    for (let i = 1; i <= 16; i += 1) {
       const raw = payload[i];
       const role = (raw & 0x0f) as RoleCode;
       const level = ((raw >> 4) & 0x01) as 0 | 1;
@@ -422,6 +339,89 @@ export function useSerialProtocol(): SerialProtocolHook {
       }
     }
   }, [parseStream, isConnected]);
+
+  const connect = useCallback(async () => {
+    if (!selectedPort) throw new Error("No port selected");
+    setIsConnecting(true);
+    try {
+      await selectedPort.port.open({ baudRate: 115200 });
+      if (selectedPort.port.writable) {
+        writerRef.current = selectedPort.port.writable.getWriter();
+      }
+      if (selectedPort.port.readable) {
+        readerRef.current = selectedPort.port.readable.getReader();
+        readLoop();
+      }
+      setIsConnected(true);
+      setLogs((prev) =>
+        appendLog(prev, { type: "info", message: "Connected to serial node" })
+      );
+    } catch (err) {
+      setLogs((prev) =>
+        appendLog(prev, {
+          type: "error",
+          message: `Failed to connect: ${err}`,
+        })
+      );
+      await closePort();
+      throw err;
+    } finally {
+      setIsConnecting(false);
+    }
+  }, [selectedPort, closePort, readLoop]);
+
+  const disconnect = useCallback(async () => {
+    await closePort();
+    setIsConnected(false);
+    setLogs((prev) => appendLog(prev, { type: "info", message: "Disconnected" }));
+  }, [closePort]);
+
+  const writeFrame = useCallback(async (cmd: number, payload: number[] = []) => {
+    if (!writerRef.current) throw new Error("Writer unavailable");
+    const frame = buildFrame(cmd, payload);
+    await writerRef.current.write(frame);
+    setLogs((prev) => appendLog(prev, { type: "sent", message: `CMD 0x${cmd.toString(16)} => ${Array.from(frame).map((b) => b.toString(16).padStart(2, "0")).join(" ")}` }));
+  }, []);
+
+  const sendSetRole = useCallback(
+    async (virtualIndex: number, role: RoleCode) => {
+      await writeFrame(CMD.SET_ROLE, [virtualIndex, role]);
+    },
+    [writeFrame]
+  );
+
+  const sendSetLevel = useCallback(
+    async (virtualIndex: number, level: 0 | 1) => {
+      await writeFrame(CMD.SET_LEVEL, [virtualIndex, level]);
+    },
+    [writeFrame]
+  );
+
+  const sendClkConfig = useCallback(
+    async (onMs: number, offMs: number) => {
+      const onL = onMs & 0xff;
+      const onH = (onMs >> 8) & 0xff;
+      const offL = offMs & 0xff;
+      const offH = (offMs >> 8) & 0xff;
+      await writeFrame(CMD.CLK_CONFIG, [onL, onH, offL, offH]);
+    },
+    [writeFrame]
+  );
+
+  const sendClkEnable = useCallback(
+    async (enable: boolean) => {
+      await writeFrame(CMD.CLK_ENABLE, [enable ? 1 : 0]);
+    },
+    [writeFrame]
+  );
+
+  const sendReset = useCallback(async () => {
+    await writeFrame(CMD.RESET);
+  }, [writeFrame]);
+
+  const requestStatus = useCallback(async () => {
+    await writeFrame(CMD.STATUS_REQUEST);
+  }, [writeFrame]);
 
   useEffect(() => {
     if (!navigator.serial) return;

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { ICTruthTable, TruthTableEntry } from '../data/icTruthTables';
 import { loadICData } from '../utils/icDataLoader';
 
@@ -41,7 +41,7 @@ export default function ICTruthTableVerifier({
     } else {
       setICData(null);
     }
-  }, [selectedIC]);
+  }, [onClockFrequencyChange, selectedIC]);
 
   // Handle clock frequency change
   const handleFrequencyChange = (freq: number) => {
@@ -50,7 +50,7 @@ export default function ICTruthTableVerifier({
   };
 
   // Verify current pin states against truth table
-  const verifyCurrentState = () => {
+  const verifyCurrentState = useCallback(() => {
     if (!icData || !currentPinStates) return;
 
     const entry = icData.truthTable[currentEntry];
@@ -212,45 +212,52 @@ export default function ICTruthTableVerifier({
       passed: failures.length === 0,
       failures
     });
-  };
+  }, [currentEntry, currentPinStates, icData, selectedFrequency]);
 
   // Apply truth table entry to pins
-  const applyTruthTableEntry = (entry: TruthTableEntry) => {
-    if (!icData) return;
+  const applyTruthTableEntry = useCallback(
+    (entry: TruthTableEntry) => {
+      if (!icData) return;
 
-    const newPinStates = { ...currentPinStates };
-    
-    // Set input pins according to truth table entry
-    Object.entries(entry.inputs).forEach(([pin, state]) => {
-      const pinConfig = icData.pinConfiguration?.find(p => p.name === pin);
-      if (!pinConfig) return;
+      const newPinStates = { ...currentPinStates };
 
-      const pinNumber = pinConfig.pin;
-      if (pinNumber > 0) {
-        // For sequential ICs, handle clock separately
-        if (icData.type === 'sequential' && pin.includes('CLK')) {
-          // Clock pin is handled by the auto-verification logic
-          return;
+      // Set input pins according to truth table entry
+      Object.entries(entry.inputs).forEach(([pin, state]) => {
+        const pinConfig = icData.pinConfiguration?.find((p) => p.name === pin);
+        if (!pinConfig) return;
+
+        const pinNumber = pinConfig.pin;
+        if (pinNumber > 0) {
+          // For sequential ICs, handle clock separately
+          if (icData.type === "sequential" && pin.includes("CLK")) {
+            // Clock pin is handled by the auto-verification logic
+            return;
+          }
+          newPinStates[pinNumber] = state;
         }
-        newPinStates[pinNumber] = state;
+      });
+
+      // For sequential ICs, ensure clock starts low
+      if (icData.type === "sequential" && icData.clockPin) {
+        newPinStates[icData.clockPin] = false;
       }
-    });
 
-    // For sequential ICs, ensure clock starts low
-    if (icData.type === 'sequential' && icData.clockPin) {
-      newPinStates[icData.clockPin] = false;
-    }
-
-    onPinStateChange(newPinStates);
-  };
+      onPinStateChange(newPinStates);
+    },
+    [currentPinStates, icData, onPinStateChange]
+  );
 
   // Move to next truth table entry
-  const nextEntry = () => {
+  const nextEntry = useCallback(() => {
     if (!icData) return;
-    const nextIndex = (currentEntry + 1) % icData.truthTable.length;
-    setCurrentEntry(nextIndex);
-    applyTruthTableEntry(icData.truthTable[nextIndex]);
-  };
+    setCurrentEntry((prev) => {
+      const nextIndex = icData.truthTable.length ? (prev + 1) % icData.truthTable.length : 0;
+      if (icData.truthTable[nextIndex]) {
+        applyTruthTableEntry(icData.truthTable[nextIndex]);
+      }
+      return nextIndex;
+    });
+  }, [applyTruthTableEntry, icData]);
 
   // Auto-verification effect
   useEffect(() => {
@@ -326,7 +333,19 @@ export default function ICTruthTableVerifier({
         clearInterval(interval);
       }
     };
-  }, [autoVerify, isConnected, currentEntry, icData, selectedFrequency]);
+  }, [
+    applyTruthTableEntry,
+    autoVerify,
+    currentEntry,
+    currentPinStates,
+    icData,
+    isConnected,
+    nextEntry,
+    onPinStateChange,
+    selectedFrequency,
+    selectedIC,
+    verifyCurrentState,
+  ]);
 
   if (!selectedIC || !icData) {
     return null;

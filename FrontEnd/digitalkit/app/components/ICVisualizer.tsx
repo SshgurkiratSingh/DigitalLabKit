@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useState, useEffect } from "react";
 
 interface Pin {
@@ -44,7 +45,7 @@ function ICImage({
     setTriedJpg(false);
   }, [partNumber]);
 
-  const handleError = () => {
+  const handleImageError = () => {
     if (!triedJpg) {
       setImgSrc(`/ic_img/${partNumber}.jpg`);
       setTriedJpg(true);
@@ -64,22 +65,18 @@ function ICImage({
           minHeight: 0,
         }}
       >
-        <img
+        <Image
           src={imgSrc}
           alt={`${partNumber} IC`}
+          fill
           onClick={onClick}
-          onError={handleError}
+          onError={() => handleImageError()}
+          sizes="(max-width: 768px) 90vw, 600px"
+          className="object-contain"
           style={{
-            position: "absolute",
-            top: "50%",
-            left: "50%",
-            maxWidth: "100%",
-            maxHeight: "100%",
-            transform: `translate(-50%, -50%) scale(${scale})`,
-            transformOrigin: "center center",
+            transform: `scale(${scale})`,
             transition: "transform 0.2s",
-            objectFit: "contain",
-            display: "block",
+            transformOrigin: "center center",
           }}
           tabIndex={0}
           aria-label="Enlarge IC image"
@@ -93,12 +90,14 @@ function ICImage({
     : "h-full max-h-[200px] object-contain cursor-zoom-in";
 
   return (
-    <img
+    <Image
       src={imgSrc}
       alt={`${partNumber} IC`}
+      width={400}
+      height={200}
       className={className}
       onClick={onClick}
-      onError={handleError}
+      onError={() => handleImageError()}
       style={{ transition: "box-shadow 0.2s" }}
       tabIndex={0}
       aria-label="Enlarge IC image"
@@ -124,13 +123,19 @@ function ImageModal({
       aria-modal="true"
       role="dialog"
     >
-      <img
-        src={src}
-        alt={alt}
-        className="max-h-[80vh] max-w-[90vw] rounded shadow-lg border-4 border-white"
-        onClick={e => e.stopPropagation()}
-        style={{ background: "#fff" }}
-      />
+      <div
+        className="relative max-h-[80vh] max-w-[90vw] rounded border-4 border-white shadow-lg"
+        style={{ background: "#fff", width: "min(90vw, 960px)", height: "min(80vh, 720px)" }}
+        onClick={(event) => event.stopPropagation()}
+      >
+        <Image
+          src={src}
+          alt={alt}
+          fill
+          sizes="(max-width: 960px) 90vw, 960px"
+          className="object-contain"
+        />
+      </div>
       <button
         className="absolute top-4 right-6 text-white text-3xl font-bold"
         onClick={onClose}

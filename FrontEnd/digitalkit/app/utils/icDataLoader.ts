@@ -1,5 +1,26 @@
 import { ICTruthTable, TruthTableEntry } from '../data/icTruthTables';
 
+type TruthTablePrimitive = number | string | boolean;
+type TruthTableInputs = number[] | Record<string, TruthTablePrimitive>;
+type TruthTableOutputs = Record<string, TruthTablePrimitive>;
+
+interface TruthTableJsonEntry
+  extends Record<string, TruthTableInputs | TruthTableOutputs | TruthTablePrimitive | undefined> {
+  inputs: TruthTableInputs;
+  output?: number;
+  outputs?: TruthTableOutputs;
+  CLK?: TruthTablePrimitive;
+  CLR?: TruthTablePrimitive;
+  J?: TruthTablePrimitive;
+  K?: TruthTablePrimitive;
+  Q?: TruthTablePrimitive;
+  QB?: TruthTablePrimitive;
+  LE?: TruthTablePrimitive;
+  D?: TruthTablePrimitive;
+  G?: TruthTablePrimitive;
+  S?: TruthTablePrimitive;
+}
+
 interface ICJsonData {
   partNumber: string;
   description: string;
@@ -12,21 +33,7 @@ interface ICJsonData {
     function: string;
   }>;
   functional: {
-    truthTable: Array<{
-      inputs: number[] | { [key: string]: any };
-      output?: number;
-      outputs?: { [key: string]: number };
-      CLK?: string;
-      CLR?: number;
-      J?: number;
-      K?: number;
-      Q?: string | number;
-      QB?: string | number;
-      LE?: number;
-      D?: number;
-      G?: number;
-      S?: string | number;
-    }>;
+    truthTable: TruthTableJsonEntry[];
     gateCount?: number;
     inputsPerGate?: number;
     ffType?: string;
@@ -38,6 +45,78 @@ interface ICJsonData {
     };
   };
 }
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null;
+
+const isTruthTablePrimitive = (value: unknown): value is TruthTablePrimitive =>
+  typeof value === 'boolean' || typeof value === 'number' || typeof value === 'string';
+
+const isTruthTableJsonEntry = (value: unknown): value is TruthTableJsonEntry => {
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  const inputs = value.inputs;
+  if (
+    !(
+      Array.isArray(inputs) && inputs.every((item) => typeof item === 'number')
+    ) &&
+    !(isRecord(inputs) && Object.values(inputs).every(isTruthTablePrimitive))
+  ) {
+    return false;
+  }
+
+  if (
+    value.outputs !== undefined &&
+    !(isRecord(value.outputs) && Object.values(value.outputs).every(isTruthTablePrimitive))
+  ) {
+    return false;
+  }
+
+  return true;
+};
+
+const isPinConfiguration = (value: unknown): value is ICJsonData['pinConfiguration'][number] =>
+  isRecord(value) &&
+  typeof value.pin === 'number' &&
+  typeof value.name === 'string' &&
+  typeof value.type === 'string' &&
+  typeof value.function === 'string';
+
+const isICJsonData = (value: unknown): value is ICJsonData => {
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  const { partNumber, description, category, pinCount, pinConfiguration, functional } = value;
+
+  if (
+    typeof partNumber !== 'string' ||
+    typeof description !== 'string' ||
+    typeof category !== 'string' ||
+    typeof pinCount !== 'number' ||
+    !Array.isArray(pinConfiguration) ||
+    !pinConfiguration.every(isPinConfiguration) ||
+    !isRecord(functional) ||
+    !Array.isArray(functional.truthTable) ||
+    !functional.truthTable.every(isTruthTableJsonEntry)
+  ) {
+    return false;
+  }
+
+  return true;
+};
+
+const primitiveToBoolean = (value: TruthTablePrimitive): boolean => {
+  if (typeof value === 'boolean') {
+    return value;
+  }
+  if (typeof value === 'number') {
+    return value !== 0;
+  }
+  return value === '1';
+};
 
 export async function loadICData(partNumber: string): Promise<ICTruthTable | null> {
   try {
@@ -63,8 +142,8 @@ export async function loadICData(partNumber: string): Promise<ICTruthTable | nul
           continue;
         }
 
-        const data = await response.json();
-        if (!data || typeof data !== 'object') {
+        const data = (await response.json()) as unknown;
+        if (!isRecord(data)) {
           errors.push(`Invalid data format in ${file}`);
           continue;
         }
@@ -73,7 +152,8 @@ export async function loadICData(partNumber: string): Promise<ICTruthTable | nul
         const matches = findAllICMatches(data, partNumber);
         matches.forEach(match => allMatches.push({ ...match, file }));
       } catch (error) {
-        errors.push(`Error processing ${file}: ${error}`);
+        const message = error instanceof Error ? error.message : String(error);
+        errors.push(`Error processing ${file}: ${message}`);
         continue;
       }
     }
@@ -92,7 +172,7 @@ export async function loadICData(partNumber: string): Promise<ICTruthTable | nul
     }
 
     // No matches found
-    console.log(`No IC found matching number: ${partNumber}. Available ICs: ${allMatches.map(m => m.ic.partNumber).join(', ')}`);
+    console.log(`No IC found matching number: ${partNumber}.`);
     return null;
   } catch (error) {
     console.error('Error loading IC data:', error);
@@ -100,25 +180,35 @@ export async function loadICData(partNumber: string): Promise<ICTruthTable | nul
   }
 }
 
-function findAllICMatches(data: any, partNumber: string): Array<{ic: ICJsonData, matchType: string, score: number}> {
+function findAllICMatches(
+  data: Record<string, unknown>,
+  partNumber: string
+): Array<{ic: ICJsonData, matchType: string, score: number}> {
   // Extract numeric part and series prefix from the requested part number
   const requestedNumeric = partNumber.match(/\d+/)?.[0];
   if (!requestedNumeric) return [];
 
   // Search through all categories in the data
-  const categories = data['74SeriesICs'] || {};
+  const categoriesRaw = data['74SeriesICs'];
+  if (!isRecord(categoriesRaw)) {
+    return [];
+  }
+
   const allMatches: Array<{ic: ICJsonData, matchType: string, score: number}> = [];
 
   // Normalize the requested part number
   const normalizedRequestedNumber = partNumber.replace(/[^0-9]/g, '');
   const requestedSeries = partNumber.toLowerCase().includes('74') ? '74' : '';
 
-  for (const category of Object.values(categories)) {
-    if (category && typeof category === 'object') {
-      const entries = Object.entries(category as { [key: string]: ICJsonData });
-      
+  for (const category of Object.values(categoriesRaw)) {
+    if (isRecord(category)) {
+      const entries = Object.entries(category);
+
       // Collect all potential matches with their scores
       for (const [icNumber, icData] of entries) {
+        if (!isICJsonData(icData)) {
+          continue;
+        }
         // Normalize the IC number for comparison
         const normalizedICNumber = icNumber.replace(/[^0-9]/g, '');
         const icSeries = icNumber.toLowerCase().includes('74') ? '74' : '';
@@ -172,29 +262,6 @@ function findAllICMatches(data: any, partNumber: string): Array<{ic: ICJsonData,
   return allMatches;
 }
 
-// Helper function to find longest common substring
-function findLongestCommonSubstring(str1: string, str2: string): string {
-  const m = str1.length;
-  const n = str2.length;
-  const dp: number[][] = Array(m + 1).fill(0).map(() => Array(n + 1).fill(0));
-  let maxLength = 0;
-  let endIndex = 0;
-
-  for (let i = 1; i <= m; i++) {
-    for (let j = 1; j <= n; j++) {
-      if (str1[i - 1] === str2[j - 1]) {
-        dp[i][j] = dp[i - 1][j - 1] + 1;
-        if (dp[i][j] > maxLength) {
-          maxLength = dp[i][j];
-          endIndex = i - 1;
-        }
-      }
-    }
-  }
-
-  return str1.slice(endIndex - maxLength + 1, endIndex + 1);
-}
-
 function convertToICTruthTable(icData: ICJsonData): ICTruthTable {
   const isSequential = ['FLIP_FLOP', 'LATCH', 'COUNTER', 'SHIFT_REGISTER'].includes(icData.category);
   const isCombinational = ['LOGIC_GATE', 'MULTIPLEXER', 'DEMULTIPLEXER'].includes(icData.category);
@@ -238,39 +305,46 @@ function convertToICTruthTable(icData: ICJsonData): ICTruthTable {
         // Handle multiple outputs if present
         else if (entry.outputs) {
           Object.entries(entry.outputs).forEach(([key, value]) => {
-            convertedEntry.outputs[key] = Boolean(value);
+            convertedEntry.outputs[key] = primitiveToBoolean(value);
           });
         }
       }
       // Handle named inputs/outputs
       else {
-        Object.entries(entry).forEach(([key, value]) => {
+        const entryRecord = entry as Record<string, TruthTableInputs | TruthTableOutputs | TruthTablePrimitive>;
+        Object.entries(entryRecord).forEach(([key, value]) => {
+          if (!isTruthTablePrimitive(value)) {
+            return;
+          }
           // Check if key is an input pin name
           if (inputs.includes(key)) {
-            convertedEntry.inputs[key] = typeof value === 'boolean' ? value :
-                                       typeof value === 'number' ? value === 1 :
-                                       typeof value === 'string' ? value === '1' : false;
+            convertedEntry.inputs[key] = primitiveToBoolean(value);
           }
           // Check if key is an output pin name
           else if (outputs.includes(key)) {
-            convertedEntry.outputs[key] = typeof value === 'boolean' ? value :
-                                        typeof value === 'number' ? value === 1 :
-                                        typeof value === 'string' ? value === '1' : false;
+            convertedEntry.outputs[key] = primitiveToBoolean(value);
           }
         });
       }
     } else {
       // For sequential ICs, handle named signals
-      Object.entries(entry).forEach(([key, value]) => {
-        if (key === 'CLK' || key === 'CLR' || key.startsWith('J') || key.startsWith('K') || 
-            key === 'D' || key === 'LE' || key === 'S') {
-          convertedEntry.inputs[key] = typeof value === 'string' ? value === '1' :
-                                     typeof value === 'number' ? value === 1 :
-                                     typeof value === 'boolean' ? value : false;
+      const entryRecord = entry as Record<string, TruthTableInputs | TruthTableOutputs | TruthTablePrimitive>;
+      Object.entries(entryRecord).forEach(([key, value]) => {
+        if (!isTruthTablePrimitive(value)) {
+          return;
+        }
+        if (
+          key === 'CLK' ||
+          key === 'CLR' ||
+          key.startsWith('J') ||
+          key.startsWith('K') ||
+          key === 'D' ||
+          key === 'LE' ||
+          key === 'S'
+        ) {
+          convertedEntry.inputs[key] = primitiveToBoolean(value);
         } else if (key === 'Q' || key === 'QB' || key.startsWith('Y')) {
-          convertedEntry.outputs[key] = typeof value === 'string' ? value === '1' :
-                                      typeof value === 'number' ? value === 1 :
-                                      typeof value === 'boolean' ? value : false;
+          convertedEntry.outputs[key] = primitiveToBoolean(value);
         }
       });
     }
@@ -297,7 +371,7 @@ function convertToICTruthTable(icData: ICJsonData): ICTruthTable {
   };
 }
 
-function generateDescription(category: string, entry: any): string {
+function generateDescription(category: string, entry: TruthTableJsonEntry): string {
   switch (category) {
     case 'LOGIC_GATE':
       return `Input${Array.isArray(entry.inputs) ? 's' : ''}: ${JSON.stringify(entry.inputs)}, Output${entry.outputs ? 's' : ''}: ${JSON.stringify(entry.output ?? entry.outputs)}`;

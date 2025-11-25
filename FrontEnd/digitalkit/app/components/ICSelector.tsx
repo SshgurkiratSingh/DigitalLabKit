@@ -23,6 +23,19 @@ interface ICFile {
   };
 }
 
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null;
+
+const isICDataLike = (value: unknown): value is ICData => {
+  if (!isRecord(value)) return false;
+  return (
+    typeof value.partNumber === "string" &&
+    typeof value.description === "string" &&
+    typeof value.pinCount === "number" &&
+    Array.isArray(value.pinConfiguration)
+  );
+};
+
 export default function ICSelector({
   onICSelect,
 }: {
@@ -83,26 +96,24 @@ export default function ICSelector({
               continue;
             }
 
-            const extractICs = (obj: any) => {
-              if (obj && typeof obj === "object") {
-                if ("partNumber" in obj) {
-                  if (obj.pinCount >= 14 && obj.pinCount <= 16) {
-                    const icWithCategory = {
-                      ...obj,
-                      category: file.replace(/IC$|Ic$/, ""),
-                    };
-                    if (
-                      !ics.some(
-                        existingIC =>
-                          existingIC.partNumber === obj.partNumber
-                      )
-                    ) {
-                      ics.push(icWithCategory);
-                    }
+            const extractICs = (entry: unknown) => {
+              if (isICDataLike(entry)) {
+                if (entry.pinCount >= 14 && entry.pinCount <= 16) {
+                  const icWithCategory = {
+                    ...entry,
+                    category: file.replace(/IC$|Ic$/, ""),
+                  };
+                  if (
+                    !ics.some((existingIC) => existingIC.partNumber === entry.partNumber)
+                  ) {
+                    ics.push(icWithCategory);
                   }
-                } else {
-                  Object.values(obj).forEach(value => extractICs(value));
                 }
+                return;
+              }
+
+              if (isRecord(entry)) {
+                Object.values(entry).forEach((value) => extractICs(value));
               }
             };
 

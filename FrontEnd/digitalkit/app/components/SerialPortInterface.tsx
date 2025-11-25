@@ -19,33 +19,6 @@ interface SerialPortInfo {
   usbProductId?: number;
 }
 
-interface Serial extends EventTarget {
-  getPorts(): Promise<SerialPort[]>;
-  requestPort(options?: SerialPortRequestOptions): Promise<SerialPort>;
-  addEventListener(
-    type: "connect" | "disconnect",
-    listener: (event: Event) => void
-  ): void;
-  removeEventListener(
-    type: "connect" | "disconnect",
-    listener: (event: Event) => void
-  ): void;
-}
-
-interface SerialPortRequestOptions {
-  filters?: Array<{
-    usbVendorId?: number;
-    usbProductId?: number;
-  }>;
-}
-
-// Extend Navigator interface
-declare global {
-  interface Navigator {
-    serial: Serial;
-  }
-}
-
 interface SerialPortInfoWrapper {
   port: SerialPort;
   info: SerialPortInfo;
@@ -67,6 +40,33 @@ interface ICData {
 interface SerialPortInterfaceProps {
   onICSelect?: (ic: ICData | null) => void;
 }
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null;
+
+const isPinConfigArray = (
+  value: unknown
+): value is ICData["pinConfiguration"] =>
+  Array.isArray(value) &&
+  value.every(
+    (pin) =>
+      isRecord(pin) &&
+      typeof pin.pin === "number" &&
+      typeof pin.name === "string" &&
+      typeof pin.type === "string" &&
+      typeof pin.function === "string"
+  );
+
+const isICEntry = (value: unknown): value is ICData => {
+  if (!isRecord(value)) return false;
+  return (
+    typeof value.partNumber === "string" &&
+    typeof value.description === "string" &&
+    typeof value.category === "string" &&
+    typeof value.pinCount === "number" &&
+    isPinConfigArray(value.pinConfiguration)
+  );
+};
 
 export default function SerialPortInterface({
   onICSelect,
@@ -105,7 +105,12 @@ export default function SerialPortInterface({
   // Request and list available ports
   const listPorts = async () => {
     try {
-      const availablePorts = await navigator.serial.getPorts();
+      const serialApi = navigator.serial;
+      if (!serialApi) {
+        setError("Web Serial API not supported");
+        return;
+      }
+      const availablePorts = await serialApi.getPorts();
       const portsInfo = availablePorts.map((port) => ({
         port,
         info: port.getInfo(),
@@ -121,7 +126,12 @@ export default function SerialPortInterface({
   // Request port access
   const requestPort = async () => {
     try {
-      const port = await navigator.serial.requestPort();
+      const serialApi = navigator.serial;
+      if (!serialApi) {
+        setError("Web Serial API not supported");
+        return;
+      }
+      const port = await serialApi.requestPort();
       const portInfo = {
         port,
         info: port.getInfo(),
@@ -559,8 +569,6 @@ export default function SerialPortInterface({
           // If no matches found, try more lenient matching
           const similarICs = allICs.filter((ic) => {
             const icDigits = ic.partNumber.match(/\d+/)?.[0];
-            const icPrefix =
-              ic.partNumber.match(/^[a-zA-Z]+/)?.[0]?.toLowerCase() || "";
 
             // Allow for any numeric overlap
             return (
@@ -867,55 +875,34 @@ export default function SerialPortInterface({
           if (!response.ok) {
             throw new Error(`Failed to load ${file}: ${response.statusText}`);
           }
-          const data = await response.json();
-          if (!data || typeof data !== "object") {
+          const data = (await response.json()) as unknown;
+          if (!isRecord(data)) {
             throw new Error(`Invalid data format in ${file}`);
           }
 
           // Extract ICs from nested structure with improved type checking
-          Object.values(data).forEach((series: any) => {
-            if (!series || typeof series !== "object") {
+          Object.values(data).forEach((series) => {
+            if (!isRecord(series)) {
               console.warn("Invalid series data found, skipping...");
               return;
             }
-            Object.values(series).forEach((category: any) => {
-              if (!category || typeof category !== "object") {
+            Object.values(series).forEach((category) => {
+              if (!isRecord(category)) {
                 console.warn("Invalid category data found, skipping...");
                 return;
               }
-              Object.values(category).forEach((ic: any) => {
-                if (!ic || typeof ic !== "object") {
-                  console.warn("Invalid IC data found, skipping...");
+              Object.values(category).forEach((icEntry) => {
+                if (isICEntry(icEntry)) {
+                  allICData.push(icEntry);
                   return;
                 }
-                // Validate required IC properties
-                if (
-                  ic.partNumber &&
-                  typeof ic.partNumber === "string" &&
-                  ic.description &&
-                  typeof ic.description === "string" &&
-                  ic.category &&
-                  typeof ic.category === "string" &&
-                  ic.pinCount &&
-                  typeof ic.pinCount === "number" &&
-                  Array.isArray(ic.pinConfiguration) &&
-                  ic.pinConfiguration.every(
-                    (pin: any) =>
-                      pin &&
-                      typeof pin.pin === "number" &&
-                      typeof pin.name === "string" &&
-                      typeof pin.type === "string" &&
-                      typeof pin.function === "string"
-                  )
-                ) {
-                  allICData.push(ic as ICData);
-                } else {
-                  console.warn(
-                    `Skipping IC with invalid or missing properties: ${
-                      ic.partNumber || "unknown"
-                    }`
-                  );
-                }
+                const partNumber =
+                  isRecord(icEntry) && typeof icEntry.partNumber === "string"
+                    ? icEntry.partNumber
+                    : "unknown";
+                console.warn(
+                  `Skipping IC with invalid or missing properties: ${partNumber}`
+                );
               });
             });
           });
@@ -956,11 +943,11 @@ export default function SerialPortInterface({
   useEffect(() => {
     if (!isSerialSupported) return;
 
-    const handleConnect = (e: Event) => {
+    const handleConnect = () => {
       listPorts();
     };
 
-    const handleDisconnect = (e: Event) => {
+    const handleDisconnect = () => {
       listPorts();
       if (selectedPort && !ports.find((p) => p.port === selectedPort)) {
         setSelectedPort(null);
@@ -968,15 +955,15 @@ export default function SerialPortInterface({
       }
     };
 
-    navigator.serial.addEventListener("connect", handleConnect);
-    navigator.serial.addEventListener("disconnect", handleDisconnect);
+    navigator.serial?.addEventListener("connect", handleConnect);
+    navigator.serial?.addEventListener("disconnect", handleDisconnect);
 
     // Initial port list
     listPorts();
 
     return () => {
-      navigator.serial.removeEventListener("connect", handleConnect);
-      navigator.serial.removeEventListener("disconnect", handleDisconnect);
+      navigator.serial?.removeEventListener("connect", handleConnect);
+      navigator.serial?.removeEventListener("disconnect", handleDisconnect);
     };
   }, [isSerialSupported, ports, selectedPort]);
 
@@ -1092,111 +1079,111 @@ export default function SerialPortInterface({
 
       {/* Debug Log - Spanning both columns on medium screens and above */}
       {showDebugLog && (
-      <div className="md:col-span-2 p-6 bg-[var(--background)] rounded-lg shadow-lg border-2 border-blue-500">
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-xl font-semibold text-[var(--foreground)] flex items-center">
-            <span className="mr-2">🔍</span>
-            Debug Log
-          </h2>
-          <div className="flex space-x-2">
-            <button
-              onClick={() => setShowDebugLog(!showDebugLog)}
-              className="px-4 py-2 text-sm bg-purple-700 text-purple-100 rounded-md hover:bg-purple-600"
-            >
-              {showDebugLog ? "Hide Debug Log" : "Show Debug Log"}
-            </button>
-            <button
-              onClick={() => setDebugLogs([])}
-              className="px-4 py-2 text-sm bg-red-700 text-red-100 rounded-md hover:bg-red-600 dark:bg-red-900 dark:text-red-100 dark:hover:bg-red-800"
-            >
-              Clear Log
-            </button>
-            <button
-              onClick={() => {
-                if (isConnected) {
-                  sendData("SYNC\n");
-                }
-              }}
-              disabled={!isConnected}
-              className="px-4 py-2 text-sm bg-blue-700 text-blue-100 rounded-md hover:bg-blue-600 dark:bg-blue-900 dark:text-blue-100 dark:hover:bg-blue-800 disabled:opacity-50"
-            >
-              Request Sync
-            </button>
-            <button
-              onClick={() => {
-                setDebugLogs((prev) => [
-                  ...prev,
-                  {
-                    timestamp: new Date().toISOString(),
-                    type: "info",
-                    message: `Current buffer content: "${commandBufferRef.current}"`,
-                  },
-                ]);
-              }}
-              className="px-4 py-2 text-sm bg-yellow-700 text-yellow-100 rounded-md hover:bg-yellow-600 dark:bg-yellow-900 dark:text-yellow-100 dark:hover:bg-yellow-800"
-            >
-              Show Buffer
-            </button>
-            <button
-              onClick={() => sendData("CLOCK:PULSE\n")}
-              disabled={!isConnected}
-              className="px-4 py-2 text-sm bg-teal-700 text-teal-100 rounded-md hover:bg-teal-600 dark:bg-teal-900 dark:text-teal-100 dark:hover:bg-teal-800 disabled:opacity-50"
-            >
-              Send CLOCK:PULSE
-            </button>
-          </div>
-        </div>
-
-        <div className="h-96 overflow-y-auto border rounded border-neutral-700 bg-neutral-800">
-          <div className="sticky top-0 bg-neutral-700 border-b border-neutral-600">
-            <div className="grid grid-cols-12 gap-2 px-4 py-2 text-xs font-medium text-neutral-400">
-              <div className="col-span-2">Time</div>
-              <div className="col-span-2">Type</div>
-              <div className="col-span-8">Message</div>
+        <div className="md:col-span-2 p-6 bg-[var(--background)] rounded-lg shadow-lg border-2 border-blue-500">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl font-semibold text-[var(--foreground)] flex items-center">
+              <span className="mr-2">🔍</span>
+              Debug Log
+            </h2>
+            <div className="flex space-x-2">
+              <button
+                onClick={() => setShowDebugLog(!showDebugLog)}
+                className="px-4 py-2 text-sm bg-purple-700 text-purple-100 rounded-md hover:bg-purple-600"
+              >
+                {showDebugLog ? "Hide Debug Log" : "Show Debug Log"}
+              </button>
+              <button
+                onClick={() => setDebugLogs([])}
+                className="px-4 py-2 text-sm bg-red-700 text-red-100 rounded-md hover:bg-red-600 dark:bg-red-900 dark:text-red-100 dark:hover:bg-red-800"
+              >
+                Clear Log
+              </button>
+              <button
+                onClick={() => {
+                  if (isConnected) {
+                    sendData("SYNC\n");
+                  }
+                }}
+                disabled={!isConnected}
+                className="px-4 py-2 text-sm bg-blue-700 text-blue-100 rounded-md hover:bg-blue-600 dark:bg-blue-900 dark:text-blue-100 dark:hover:bg-blue-800 disabled:opacity-50"
+              >
+                Request Sync
+              </button>
+              <button
+                onClick={() => {
+                  setDebugLogs((prev) => [
+                    ...prev,
+                    {
+                      timestamp: new Date().toISOString(),
+                      type: "info",
+                      message: `Current buffer content: "${commandBufferRef.current}"`,
+                    },
+                  ]);
+                }}
+                className="px-4 py-2 text-sm bg-yellow-700 text-yellow-100 rounded-md hover:bg-yellow-600 dark:bg-yellow-900 dark:text-yellow-100 dark:hover:bg-yellow-800"
+              >
+                Show Buffer
+              </button>
+              <button
+                onClick={() => sendData("CLOCK:PULSE\n")}
+                disabled={!isConnected}
+                className="px-4 py-2 text-sm bg-teal-700 text-teal-100 rounded-md hover:bg-teal-600 dark:bg-teal-900 dark:text-teal-100 dark:hover:bg-teal-800 disabled:opacity-50"
+              >
+                Send CLOCK:PULSE
+              </button>
             </div>
           </div>
 
-          <div className="divide-y divide-neutral-700">
-            {debugLogs
-              .slice()
-              .reverse()
-              .map((log, index) => (
-                <div
-                  key={index}
-                  className="grid grid-cols-12 gap-2 px-4 py-2 text-sm hover:bg-neutral-700"
-                >
-                  <div className="col-span-2 text-neutral-400">
-                    {new Date(log.timestamp).toLocaleTimeString()}
-                  </div>
-                  <div className="col-span-2">
-                    <span
-                      className={`inline-block px-2 py-0.5 text-xs rounded-full ${
-                        log.type === "received"
-                          ? "bg-green-700 text-green-100 dark:bg-green-900 dark:text-green-100"
-                          : log.type === "sent"
-                          ? "bg-blue-700 text-blue-100 dark:bg-blue-900 dark:text-blue-100"
-                          : log.type === "info"
-                          ? "bg-neutral-600 text-neutral-100 dark:bg-gray-900 dark:text-gray-100"
-                          : "bg-red-700 text-red-100 dark:bg-red-900 dark:text-red-100"
-                      }`}
-                    >
-                      {log.type}
-                    </span>
-                  </div>
-                  <div className="col-span-8 font-mono text-[var(--foreground)] break-all">
-                    {log.message}
-                  </div>
-                </div>
-              ))}
-          </div>
-        </div>
+          <div className="h-96 overflow-y-auto border rounded border-neutral-700 bg-neutral-800">
+            <div className="sticky top-0 bg-neutral-700 border-b border-neutral-600">
+              <div className="grid grid-cols-12 gap-2 px-4 py-2 text-xs font-medium text-neutral-400">
+                <div className="col-span-2">Time</div>
+                <div className="col-span-2">Type</div>
+                <div className="col-span-8">Message</div>
+              </div>
+            </div>
 
-        {debugLogs.length === 0 && (
-          <div className="text-center p-4 text-neutral-400">
-            No debug messages yet
+            <div className="divide-y divide-neutral-700">
+              {debugLogs
+                .slice()
+                .reverse()
+                .map((log, index) => (
+                  <div
+                    key={index}
+                    className="grid grid-cols-12 gap-2 px-4 py-2 text-sm hover:bg-neutral-700"
+                  >
+                    <div className="col-span-2 text-neutral-400">
+                      {new Date(log.timestamp).toLocaleTimeString()}
+                    </div>
+                    <div className="col-span-2">
+                      <span
+                        className={`inline-block px-2 py-0.5 text-xs rounded-full ${
+                          log.type === "received"
+                            ? "bg-green-700 text-green-100 dark:bg-green-900 dark:text-green-100"
+                            : log.type === "sent"
+                            ? "bg-blue-700 text-blue-100 dark:bg-blue-900 dark:text-blue-100"
+                            : log.type === "info"
+                            ? "bg-neutral-600 text-neutral-100 dark:bg-gray-900 dark:text-gray-100"
+                            : "bg-red-700 text-red-100 dark:bg-red-900 dark:text-red-100"
+                        }`}
+                      >
+                        {log.type}
+                      </span>
+                    </div>
+                    <div className="col-span-8 font-mono text-[var(--foreground)] break-all">
+                      {log.message}
+                    </div>
+                  </div>
+                ))}
+            </div>
           </div>
-        )}
-      </div>
+
+          {debugLogs.length === 0 && (
+            <div className="text-center p-4 text-neutral-400">
+              No debug messages yet
+            </div>
+          )}
+        </div>
       )}
     </div>
   );

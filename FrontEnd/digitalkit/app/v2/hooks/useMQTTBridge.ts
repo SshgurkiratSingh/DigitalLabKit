@@ -47,7 +47,7 @@ interface MQTTBridgeResult {
 }
 
 const DEFAULT_BROKER =
-  process.env.NEXT_PUBLIC_MQTT_WS_URL || "ws://localhost:9001/mqtt";
+  process.env.NEXT_PUBLIC_MQTT_WS_URL || "ws://98.93.38.49:9001/mqtt";
 
 export const useMQTTBridge = (
   options?: MQTTBridgeOptions

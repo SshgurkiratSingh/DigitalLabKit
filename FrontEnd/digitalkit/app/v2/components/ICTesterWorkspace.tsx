@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import {
   ChangeEvent,
   useCallback,
@@ -47,8 +48,13 @@ interface TruthRow {
 const normalizeLevel = (value: unknown): 0 | 1 => {
   if (typeof value === "number") return value ? 1 : 0;
   if (typeof value === "boolean") return value ? 1 : 0;
-  if (typeof value === "string")
-    return value === "1" || value.toUpperCase() === "HIGH" ? 1 : 0;
+  if (typeof value === "string") {
+    const normalized = value.trim().toUpperCase();
+    if (["1", "HIGH", "ON", "TRUE"].includes(normalized)) return 1;
+    if (["0", "LOW", "OFF", "FALSE"].includes(normalized)) return 0;
+    const parsed = Number(normalized);
+    if (!Number.isNaN(parsed)) return parsed ? 1 : 0;
+  }
   return 0;
 };
 
@@ -90,7 +96,9 @@ const PinButton = ({
       </span>
       <div className="mt-2 flex flex-wrap items-center justify-center gap-2 text-[11px] font-semibold uppercase tracking-wide">
         <span
-          className={`rounded-full px-2 py-0.5 text-white ${ROLE_COLORS[assignment.role]}`}
+          className={`rounded-full px-2 py-0.5 text-white ${
+            ROLE_COLORS[assignment.role]
+          }`}
         >
           {ROLE_LABELS[assignment.role]}
         </span>
@@ -138,6 +146,16 @@ const buildPinTopic = (base: string, pin: number) => {
 const buildMetadataTopic = (base: string) => {
   const root = sanitizeTopicBase(base);
   return `${root}/icName`;
+};
+
+const buildInputPinsTopic = (base: string) => {
+  const root = sanitizeTopicBase(base);
+  return `${root}/inputs`;
+};
+
+const buildOutputPinsTopic = (base: string) => {
+  const root = sanitizeTopicBase(base);
+  return `${root}/outputs`;
 };
 
 const buildVirtualLookup = (assignments: PinAssignment[]): VirtualLookup => {
@@ -480,17 +498,23 @@ const PinFullscreenOverlay = ({
                   <p className="text-2xl font-semibold text-white">
                     {assignment.name}
                   </p>
-                  <span className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide ${levelBadge}`}>
+                  <span
+                    className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide ${levelBadge}`}
+                  >
                     {level ? "HIGH" : "LOW"}
                   </span>
                 </div>
                 <div className="flex flex-wrap items-center gap-2 text-[11px] font-semibold uppercase tracking-wide">
                   <span
-                    className={`rounded-full px-2 py-0.5 text-white ${ROLE_COLORS[assignment.role]}`}
+                    className={`rounded-full px-2 py-0.5 text-white ${
+                      ROLE_COLORS[assignment.role]
+                    }`}
                   >
                     {ROLE_LABELS[assignment.role]}
                   </span>
-                  <span className={`rounded-full border px-2 py-0.5 ${driveBadge}`}>
+                  <span
+                    className={`rounded-full border px-2 py-0.5 ${driveBadge}`}
+                  >
                     {canDrive ? "Drive capable" : "Sense only"}
                   </span>
                 </div>
@@ -626,15 +650,19 @@ const ImageModal = ({
         </div>
       </div>
       <div className="flex flex-1 items-center justify-center bg-black">
-        <img
-          src={src}
-          alt={`${partNumber} package`}
-          style={{
-            transform: `scale(${zoom})`,
-            transformOrigin: "center center",
-          }}
-          className="max-h-full max-w-full object-contain"
-        />
+        <div className="relative h-full w-full">
+          <Image
+            src={src}
+            alt={`${partNumber} package`}
+            fill
+            sizes="(max-width: 1024px) 90vw, 600px"
+            style={{
+              transform: `scale(${zoom})`,
+              transformOrigin: "center center",
+            }}
+            className="object-contain"
+          />
+        </div>
       </div>
     </div>
   </div>
@@ -698,6 +726,13 @@ const ICTesterWorkspace = () => {
     Record<string, { payload: string; timestamp: number }>
   >({});
   const lastMetadataPayloadRef = useRef<string | null>(null);
+  const lastRolePayloadRef = useRef<{
+    inputs: string | null;
+    outputs: string | null;
+  }>({
+    inputs: null,
+    outputs: null,
+  });
   const mqttInputGateRef = useRef<Record<number, number>>({});
 
   const assignments = useMemo(() => buildAssignments(selectedIC), [selectedIC]);
@@ -732,6 +767,14 @@ const ICTesterWorkspace = () => {
     () => buildMetadataTopic(baseTopic),
     [baseTopic]
   );
+  const inputPinsTopic = useMemo(
+    () => buildInputPinsTopic(baseTopic),
+    [baseTopic]
+  );
+  const outputPinsTopic = useMemo(
+    () => buildOutputPinsTopic(baseTopic),
+    [baseTopic]
+  );
 
   const virtualRoles = useMemo<RoleCode[]>(() => {
     const roles: RoleCode[] = Array(MAX_PINS).fill(4) as RoleCode[];
@@ -739,6 +782,18 @@ const ICTesterWorkspace = () => {
       roles[assignment.virtualIndex] = assignment.role;
     });
     return roles;
+  }, [assignments]);
+
+  const icInputPins = useMemo(() => {
+    return assignments
+      .filter((assignment) => [1, 5].includes(assignment.role))
+      .map((assignment) => assignment.icPin);
+  }, [assignments]);
+
+  const icOutputPins = useMemo(() => {
+    return assignments
+      .filter((assignment) => assignment.role === 0)
+      .map((assignment) => assignment.icPin);
   }, [assignments]);
 
   const setPinLevel = useCallback(
@@ -775,6 +830,7 @@ const ICTesterWorkspace = () => {
     prevPinStatesRef.current = {};
     lastPublishedRef.current = {};
     mqttInputGateRef.current = {};
+    lastRolePayloadRef.current = { inputs: null, outputs: null };
     setPinFullscreen(false);
   }, [selectedIC]);
 
@@ -782,12 +838,14 @@ const ICTesterWorkspace = () => {
     lastPublishedRef.current = {};
     lastMetadataPayloadRef.current = null;
     mqttInputGateRef.current = {};
+    lastRolePayloadRef.current = { inputs: null, outputs: null };
   }, [baseTopic]);
 
   useEffect(() => {
     if (!mqttEnabled) {
       lastMetadataPayloadRef.current = null;
       mqttInputGateRef.current = {};
+      lastRolePayloadRef.current = { inputs: null, outputs: null };
     }
   }, [mqttEnabled]);
 
@@ -936,6 +994,28 @@ const ICTesterWorkspace = () => {
     lastMetadataPayloadRef.current = payload;
     publishMQTT(metadataTopic, payload);
   }, [metadataTopic, mqttEnabled, publishMQTT, selectedIC]);
+
+  useEffect(() => {
+    if (!mqttEnabled || !selectedIC) return;
+    const inputsPayload = JSON.stringify(icInputPins);
+    if (lastRolePayloadRef.current.inputs !== inputsPayload) {
+      lastRolePayloadRef.current.inputs = inputsPayload;
+      publishMQTT(inputPinsTopic, inputsPayload);
+    }
+    const outputsPayload = JSON.stringify(icOutputPins);
+    if (lastRolePayloadRef.current.outputs !== outputsPayload) {
+      lastRolePayloadRef.current.outputs = outputsPayload;
+      publishMQTT(outputPinsTopic, outputsPayload);
+    }
+  }, [
+    icInputPins,
+    icOutputPins,
+    inputPinsTopic,
+    mqttEnabled,
+    outputPinsTopic,
+    publishMQTT,
+    selectedIC,
+  ]);
 
   const handleMqttPayload = useCallback(
     async (topic: string, rawPayload: Uint8Array) => {
@@ -1392,17 +1472,21 @@ const ICTesterWorkspace = () => {
             </div>
             <div className="mt-4 grid gap-4 md:grid-cols-[220px_1fr]">
               <div className="space-y-3 rounded border border-gray-800 bg-black/30 p-3 text-center">
-                <div className="aspect-[3/2] overflow-hidden rounded bg-gray-900 flex items-center justify-center">
+                <div className="flex aspect-[3/2] items-center justify-center overflow-hidden rounded bg-gray-900">
                   {icImageSrc ? (
-                    <img
-                      src={icImageSrc}
-                      alt={`${selectedIC.partNumber} package`}
-                      style={{
-                        transform: `scale(${imageModalZoom})`,
-                        transformOrigin: "center center",
-                      }}
-                      className="max-h-full max-w-full object-contain transition-transform"
-                    />
+                    <div className="relative h-full w-full">
+                      <Image
+                        src={icImageSrc}
+                        alt={`${selectedIC.partNumber} package`}
+                        fill
+                        sizes="220px"
+                        style={{
+                          transform: `scale(${imageModalZoom})`,
+                          transformOrigin: "center center",
+                        }}
+                        className="object-contain transition-transform"
+                      />
+                    </div>
                   ) : (
                     <span className="text-xs text-gray-500">
                       No package image available
