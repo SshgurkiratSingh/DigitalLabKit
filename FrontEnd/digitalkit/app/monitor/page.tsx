@@ -48,6 +48,7 @@ export default function MonitorPage() {
     lastMessage,
     setPinMessageHandler,
     publishPinLevel,
+    publishPinCollections,
   } = useAPIBridge({
     defaultBaseTopic: "digitalkit/pins",
     autoEnable: true,
@@ -59,6 +60,23 @@ export default function MonitorPage() {
       setConnectionTime(Date.now());
     }
   }, [status, connectionTime]);
+
+  // Publish input/output pin arrays to MQTT when they change
+  useEffect(() => {
+    if (
+      status !== "connected" ||
+      inputPins.length === 0 ||
+      outputPins.length === 0
+    )
+      return;
+
+    console.log("[Monitor] Publishing pin collections:", {
+      inputs: inputPins,
+      outputs: outputPins,
+    });
+
+    publishPinCollections(inputPins, outputPins);
+  }, [inputPins, outputPins, status, publishPinCollections]);
 
   // Handle incoming pin messages from SSE and polling
   useEffect(() => {
