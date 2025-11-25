@@ -16,8 +16,10 @@ import {
   StatusFrameSnapshot,
   useSerialProtocol,
 } from "../hooks/useSerialProtocol";
-import { useMQTTBridge } from "../hooks/useMQTTBridge";
+import { PinMessage, useAPIBridge } from "../hooks/useAPIBridge";
 import { PinAssignment, buildAssignments } from "../utils/pinMapping";
+import APIFloatingBar from "./APIFloatingBar";
+import TestScriptPanel from "./TestScriptPanel";
 
 const MAX_PINS = 16;
 const ROLE_LABELS: Record<RoleCode, string> = {
@@ -128,35 +130,8 @@ type VirtualLookup = Record<number, PinAssignment>;
 
 type PinStateOrigin = "serial" | "local" | "truth" | "mqtt";
 
-const DEFAULT_BASE_TOPIC = "digitalkit/pins";
 const MQTT_ECHO_WINDOW_MS = 800;
-const MQTT_INPUT_BUFFER_MS = 300;
-
-const sanitizeTopicBase = (value: string) => {
-  const trimmed = (value ?? "").trim();
-  if (!trimmed) return DEFAULT_BASE_TOPIC;
-  return trimmed.replace(/\/{2,}/g, "/").replace(/^\/+|\/+$/g, "");
-};
-
-const buildPinTopic = (base: string, pin: number) => {
-  const root = sanitizeTopicBase(base);
-  return `${root}/pin/${pin}`;
-};
-
-const buildMetadataTopic = (base: string) => {
-  const root = sanitizeTopicBase(base);
-  return `${root}/icName`;
-};
-
-const buildInputPinsTopic = (base: string) => {
-  const root = sanitizeTopicBase(base);
-  return `${root}/inputs`;
-};
-
-const buildOutputPinsTopic = (base: string) => {
-  const root = sanitizeTopicBase(base);
-  return `${root}/outputs`;
-};
+const MQTT_HARDWARE_THROTTLE_MS = 400;
 
 const buildVirtualLookup = (assignments: PinAssignment[]): VirtualLookup => {
   return assignments.reduce<VirtualLookup>((acc, assignment) => {
@@ -704,26 +679,35 @@ const ICTesterWorkspace = () => {
   const [isImageModalOpen, setImageModalOpen] = useState(false);
   const [imageModalZoom, setImageModalZoom] = useState(1);
   const [isPinFullscreen, setPinFullscreen] = useState(false);
-  const [baseTopic, setBaseTopic] = useState(DEFAULT_BASE_TOPIC);
-  const mqttDecoder = useMemo(() => new TextDecoder(), []);
+  const [apiPanelCollapsed, setApiPanelCollapsed] = useState(false);
+  const [scriptPanelCollapsed, setScriptPanelCollapsed] = useState(true);
 
   const {
-    brokerUrl,
-    setBrokerUrl,
-    isEnabled: mqttEnabled,
-    setEnabled: setMqttEnabled,
-    status: mqttStatus,
-    error: mqttError,
-    lastMessage: mqttLastMessage,
+    backendUrl,
+    setBackendUrl,
+    baseTopic,
+    setBaseTopic,
+    isEnabled: apiEnabled,
+    setEnabled: setApiEnabled,
+    pollingInterval,
+    setPollingInterval,
+    status: apiStatus,
+    error: apiError,
+    lastMessage: apiLastMessage,
     clientId,
-    publish: publishMQTT,
-    replaceSubscriptions,
-  } = useMQTTBridge();
+    publishMetadata,
+    publishPinLevel: publishPinLevelOutbound,
+    publishPinCollections,
+    setPinMessageHandler,
+  } = useAPIBridge({
+    defaultBaseTopic: "digitalkit/pins",
+    autoEnable: true,
+  });
 
   const pinOriginsRef = useRef<Record<number, PinStateOrigin>>({});
   const prevPinStatesRef = useRef<PinStateMap>({});
   const lastPublishedRef = useRef<
-    Record<string, { payload: string; timestamp: number }>
+    Record<number, { level: 0 | 1; timestamp: number }>
   >({});
   const lastMetadataPayloadRef = useRef<string | null>(null);
   const lastRolePayloadRef = useRef<{
@@ -747,34 +731,6 @@ const ICTesterWorkspace = () => {
     });
     return map;
   }, [assignments]);
-
-  const mqttTopicMap = useMemo(() => {
-    if (!selectedIC) {
-      return { topics: [], pinToTopic: {}, topicToPin: {} };
-    }
-    const pinToTopic: Record<number, string> = {};
-    const topicToPin: Record<string, number> = {};
-    const topics: string[] = [];
-    assignments.forEach((assignment) => {
-      const topic = buildPinTopic(baseTopic, assignment.icPin);
-      pinToTopic[assignment.icPin] = topic;
-      topicToPin[topic] = assignment.icPin;
-      topics.push(topic);
-    });
-    return { topics, pinToTopic, topicToPin };
-  }, [assignments, baseTopic, selectedIC]);
-  const metadataTopic = useMemo(
-    () => buildMetadataTopic(baseTopic),
-    [baseTopic]
-  );
-  const inputPinsTopic = useMemo(
-    () => buildInputPinsTopic(baseTopic),
-    [baseTopic]
-  );
-  const outputPinsTopic = useMemo(
-    () => buildOutputPinsTopic(baseTopic),
-    [baseTopic]
-  );
 
   const virtualRoles = useMemo<RoleCode[]>(() => {
     const roles: RoleCode[] = Array(MAX_PINS).fill(4) as RoleCode[];
@@ -842,12 +798,13 @@ const ICTesterWorkspace = () => {
   }, [baseTopic]);
 
   useEffect(() => {
-    if (!mqttEnabled) {
+    if (!apiEnabled) {
+      lastPublishedRef.current = {};
       lastMetadataPayloadRef.current = null;
       mqttInputGateRef.current = {};
       lastRolePayloadRef.current = { inputs: null, outputs: null };
     }
-  }, [mqttEnabled]);
+  }, [apiEnabled]);
 
   const shouldDropMqttUpdate = useCallback((pinNumber: number) => {
     const now = Date.now();
@@ -855,7 +812,7 @@ const ICTesterWorkspace = () => {
     if (now < gate) {
       return true;
     }
-    mqttInputGateRef.current[pinNumber] = now + MQTT_INPUT_BUFFER_MS;
+    mqttInputGateRef.current[pinNumber] = now + MQTT_HARDWARE_THROTTLE_MS;
     return false;
   }, []);
 
@@ -944,19 +901,37 @@ const ICTesterWorkspace = () => {
     }
   };
 
-  const publishPinLevel = useCallback(
+  const executeScriptCommand = useCallback(
+    async (pin: number, level: 0 | 1) => {
+      if (!isConnected) {
+        throw new Error("Not connected to hardware");
+      }
+
+      const assignment = assignments.find((item) => item.icPin === pin);
+      if (!assignment) {
+        throw new Error(`Pin ${pin} not found in IC configuration`);
+      }
+
+      if (![1, 5].includes(assignment.role)) {
+        throw new Error(`Pin ${pin} is not an input pin`);
+      }
+
+      await sendSetLevel(assignment.virtualIndex, level);
+      setPinLevel(pin, level, "local");
+    },
+    [isConnected, assignments, sendSetLevel, setPinLevel]
+  );
+
+  const forwardPinLevelToMQTT = useCallback(
     (pinNumber: number, level: 0 | 1) => {
-      if (!mqttEnabled) return;
-      const topic = mqttTopicMap.pinToTopic[pinNumber];
-      if (!topic) return;
-      const payload = `${level}`;
-      lastPublishedRef.current[topic] = {
-        payload,
+      if (!apiEnabled) return;
+      lastPublishedRef.current[pinNumber] = {
+        level,
         timestamp: Date.now(),
       };
-      publishMQTT(topic, payload);
+      publishPinLevelOutbound(pinNumber, level);
     },
-    [mqttEnabled, mqttTopicMap, publishMQTT]
+    [apiEnabled, publishPinLevelOutbound]
   );
 
   useEffect(() => {
@@ -978,123 +953,139 @@ const ICTesterWorkspace = () => {
       const origin = pinOriginsRef.current[pin];
       delete pinOriginsRef.current[pin];
       if (origin === "mqtt") return;
-      publishPinLevel(pin, level);
+      forwardPinLevelToMQTT(pin, level);
     });
-  }, [pinStates, publishPinLevel]);
+  }, [forwardPinLevelToMQTT, pinStates]);
 
   useEffect(() => {
-    if (!mqttEnabled || !selectedIC) return;
-    const payload = JSON.stringify({
+    if (!apiEnabled || !selectedIC) return;
+    const payloadSnapshot = JSON.stringify({
       partNumber: selectedIC.partNumber,
       description: selectedIC.description,
       pinCount: selectedIC.pinCount,
       category: selectedIC.category,
     });
-    if (lastMetadataPayloadRef.current === payload) return;
-    lastMetadataPayloadRef.current = payload;
-    publishMQTT(metadataTopic, payload);
-  }, [metadataTopic, mqttEnabled, publishMQTT, selectedIC]);
+    if (lastMetadataPayloadRef.current === payloadSnapshot) return;
+    lastMetadataPayloadRef.current = payloadSnapshot;
+    publishMetadata(selectedIC.partNumber, {
+      partNumber: selectedIC.partNumber,
+      description: selectedIC.description,
+      pinCount: selectedIC.pinCount,
+      category: selectedIC.category,
+    });
+  }, [apiEnabled, publishMetadata, selectedIC]);
 
   useEffect(() => {
-    if (!mqttEnabled || !selectedIC) return;
+    if (!apiEnabled) return;
     const inputsPayload = JSON.stringify(icInputPins);
-    if (lastRolePayloadRef.current.inputs !== inputsPayload) {
-      lastRolePayloadRef.current.inputs = inputsPayload;
-      publishMQTT(inputPinsTopic, inputsPayload);
-    }
     const outputsPayload = JSON.stringify(icOutputPins);
-    if (lastRolePayloadRef.current.outputs !== outputsPayload) {
-      lastRolePayloadRef.current.outputs = outputsPayload;
-      publishMQTT(outputPinsTopic, outputsPayload);
+    if (
+      lastRolePayloadRef.current.inputs === inputsPayload &&
+      lastRolePayloadRef.current.outputs === outputsPayload
+    ) {
+      return;
     }
-  }, [
-    icInputPins,
-    icOutputPins,
-    inputPinsTopic,
-    mqttEnabled,
-    outputPinsTopic,
-    publishMQTT,
-    selectedIC,
-  ]);
+    lastRolePayloadRef.current = {
+      inputs: inputsPayload,
+      outputs: outputsPayload,
+    };
+    publishPinCollections(icInputPins, icOutputPins);
+  }, [icInputPins, icOutputPins, apiEnabled, publishPinCollections]);
 
   const handleMqttPayload = useCallback(
-    async (topic: string, rawPayload: Uint8Array) => {
-      if (!mqttEnabled) return;
-      const pinNumber = mqttTopicMap.topicToPin[topic];
-      if (!pinNumber) return;
-      const text = mqttDecoder.decode(rawPayload).trim();
-      let derived: 0 | 1 | null = null;
-      if (text.startsWith("{")) {
-        try {
-          const parsed = JSON.parse(text) as Record<string, unknown>;
-          if (
-            "level" in parsed &&
-            parsed.level !== undefined &&
-            parsed.level !== null
-          ) {
-            derived = normalizeLevel(parsed.level);
-          }
-        } catch {
-          // ignore malformed JSON payloads
-        }
+    async ({ pin: pinNumber, level }: PinMessage) => {
+      if (!apiEnabled || !pinNumber) {
+        console.log("[MQTT Handler] Skipped - API disabled or invalid pin", {
+          apiEnabled,
+          pinNumber,
+        });
+        return;
       }
-      if (derived === null && text.length) {
-        const lowered = text.toLowerCase();
-        if (lowered === "1" || lowered === "high") derived = 1;
-        else if (lowered === "0" || lowered === "low") derived = 0;
-      }
-      if (derived === null) return;
 
-      const echo = lastPublishedRef.current[topic];
+      // Check if this is an echo of our own publish
+      const echo = lastPublishedRef.current[pinNumber];
       if (
         echo &&
-        echo.payload === `${derived}` &&
+        echo.level === level &&
         Date.now() - echo.timestamp < MQTT_ECHO_WINDOW_MS
       ) {
+        console.log(
+          "[MQTT Handler] Skipped echo for pin",
+          pinNumber,
+          "level",
+          level
+        );
         return;
       }
 
+      // Check if we should drop this update
       if (shouldDropMqttUpdate(pinNumber)) {
+        console.log("[MQTT Handler] Dropped update for pin", pinNumber);
         return;
       }
 
-      setPinLevel(pinNumber, derived, "mqtt");
+      console.log(
+        "[MQTT Handler] Processing pin",
+        pinNumber,
+        "=>",
+        level,
+        "isConnected:",
+        isConnected
+      );
+
+      // Update UI state
+      setPinLevel(pinNumber, level, "mqtt");
+
+      // Send to hardware if connected and this is an input pin
       if (isConnected) {
         const assignment = assignmentByPin[pinNumber];
         if (assignment && [1, 5].includes(assignment.role)) {
           try {
-            await sendSetLevel(assignment.virtualIndex, derived);
+            console.log(
+              "[MQTT Handler] Sending to hardware: virtualIndex",
+              assignment.virtualIndex,
+              "level",
+              level
+            );
+            await sendSetLevel(assignment.virtualIndex, level);
+            console.log("[MQTT Handler] ✓ Successfully sent to hardware");
           } catch (err) {
-            console.error("Failed to drive pin from MQTT", err);
+            console.error(
+              "[MQTT Handler] ✗ Failed to drive pin from MQTT",
+              err
+            );
           }
+        } else {
+          console.log(
+            "[MQTT Handler] Pin",
+            pinNumber,
+            "is not an input pin (role:",
+            assignment?.role,
+            "), not sending to hardware"
+          );
         }
+      } else {
+        console.log("[MQTT Handler] Hardware not connected, only updating UI");
       }
     },
     [
       assignmentByPin,
       isConnected,
-      mqttDecoder,
-      mqttEnabled,
-      mqttTopicMap,
-      shouldDropMqttUpdate,
+      apiEnabled,
       sendSetLevel,
       setPinLevel,
+      shouldDropMqttUpdate,
     ]
   );
 
   useEffect(() => {
-    if (!mqttEnabled || !selectedIC || mqttTopicMap.topics.length === 0) {
-      replaceSubscriptions([], null);
+    if (!apiEnabled) {
+      setPinMessageHandler(null);
       return;
     }
-    replaceSubscriptions(mqttTopicMap.topics, handleMqttPayload);
-  }, [
-    handleMqttPayload,
-    mqttEnabled,
-    mqttTopicMap,
-    replaceSubscriptions,
-    selectedIC,
-  ]);
+    setPinMessageHandler(handleMqttPayload);
+    return () => setPinMessageHandler(null);
+  }, [handleMqttPayload, apiEnabled, setPinMessageHandler]);
 
   const statusSummary = (frame: StatusFrameSnapshot | null) => {
     if (!frame) return "No status";
@@ -1104,19 +1095,6 @@ const ICTesterWorkspace = () => {
 
   const datasheetUrl = selectedIC ? resolveDatasheetUrl(selectedIC) : null;
   const icImageSrc = useICPictures(selectedIC);
-  const mqttStatusLabel = mqttEnabled ? mqttStatus : "disabled";
-  const mqttLastMessageText = mqttLastMessage
-    ? `${new Date(mqttLastMessage.timestamp).toLocaleTimeString()} • ${
-        mqttLastMessage.topic
-      }`
-    : "None";
-  const mqttExampleTopic = useMemo(() => {
-    if (mqttTopicMap.topics.length) {
-      return mqttTopicMap.topics[0];
-    }
-    const fallbackPin = selectedIC?.pinConfiguration?.[0]?.pin ?? 1;
-    return buildPinTopic(baseTopic, fallbackPin);
-  }, [baseTopic, mqttTopicMap, selectedIC]);
 
   const openDatasheet = () => {
     if (datasheetUrl) window.open(datasheetUrl, "_blank");
@@ -1284,90 +1262,6 @@ const ICTesterWorkspace = () => {
                   ? "Complete"
                   : "Select an IC"}
               </p>
-            </div>
-          </div>
-        </section>
-
-        <section className="rounded-lg border border-gray-700 bg-gray-900/50 p-5">
-          <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-            <div>
-              <h2 className="text-xl font-semibold text-white">MQTT Bridge</h2>
-              <p className="text-sm text-gray-400">
-                Mirror pin levels directly to your MQTT broker and accept remote
-                overrides in real time.
-              </p>
-            </div>
-            <label className="flex items-center gap-2 text-sm text-gray-200">
-              <input
-                type="checkbox"
-                checked={mqttEnabled}
-                onChange={(event) => setMqttEnabled(event.target.checked)}
-                disabled={!selectedIC}
-              />
-              Enable bridge
-              {!selectedIC && (
-                <span className="text-xs text-gray-500">
-                  Select an IC first
-                </span>
-              )}
-            </label>
-          </div>
-          <div className="mt-4 grid gap-4 md:grid-cols-2">
-            <div className="space-y-3">
-              <div>
-                <label className="text-sm text-gray-300">
-                  MQTT WebSocket URL
-                </label>
-                <input
-                  type="text"
-                  className="mt-1 w-full rounded border border-gray-600 bg-gray-800 p-2 text-sm text-white"
-                  value={brokerUrl}
-                  onChange={(event) => setBrokerUrl(event.target.value)}
-                  placeholder="ws://localhost:9001/mqtt"
-                />
-                <p className="mt-1 text-xs text-gray-500">
-                  Enter the secure WebSocket endpoint exposed by your Mosquitto
-                  (or compatible) broker.
-                </p>
-              </div>
-              <div>
-                <label className="text-sm text-gray-300">Base Topic</label>
-                <input
-                  type="text"
-                  className="mt-1 w-full rounded border border-gray-600 bg-gray-800 p-2 text-sm text-white"
-                  value={baseTopic}
-                  onChange={(event) => setBaseTopic(event.target.value)}
-                />
-                <p className="mt-1 text-xs text-gray-500">
-                  Example pin topic:{" "}
-                  <span className="font-mono text-gray-300">
-                    {mqttExampleTopic}
-                  </span>
-                </p>
-                <p className="text-xs text-gray-500">
-                  Metadata topic:{" "}
-                  <span className="font-mono text-gray-300">
-                    {metadataTopic}
-                  </span>
-                </p>
-              </div>
-            </div>
-            <div className="space-y-1 text-sm text-gray-300">
-              <p>
-                Status:{" "}
-                <span className="font-semibold text-white">
-                  {mqttStatusLabel}
-                </span>
-              </p>
-              <p>
-                Client:{" "}
-                <span className="font-mono text-gray-400">{clientId}</span>
-              </p>
-              <p>Subscriptions: {mqttTopicMap.topics.length}</p>
-              <p>Last message: {mqttLastMessageText}</p>
-              {mqttError && (
-                <p className="text-xs text-red-400">Error: {mqttError}</p>
-              )}
             </div>
           </div>
         </section>
@@ -1599,6 +1493,29 @@ const ICTesterWorkspace = () => {
           onClose={() => setImageModalOpen(false)}
         />
       )}
+      <APIFloatingBar
+        collapsed={apiPanelCollapsed}
+        onToggle={() => setApiPanelCollapsed((prev) => !prev)}
+        status={apiStatus}
+        isEnabled={apiEnabled}
+        setEnabled={setApiEnabled}
+        backendUrl={backendUrl}
+        setBackendUrl={setBackendUrl}
+        baseTopic={baseTopic}
+        setBaseTopic={setBaseTopic}
+        pollingInterval={pollingInterval}
+        setPollingInterval={setPollingInterval}
+        clientId={clientId}
+        lastMessage={apiLastMessage}
+        error={apiError}
+      />
+      <TestScriptPanel
+        inputPins={icInputPins}
+        onExecuteCommand={executeScriptCommand}
+        isConnected={isConnected}
+        collapsed={scriptPanelCollapsed}
+        onToggle={() => setScriptPanelCollapsed((prev) => !prev)}
+      />
     </>
   );
 };

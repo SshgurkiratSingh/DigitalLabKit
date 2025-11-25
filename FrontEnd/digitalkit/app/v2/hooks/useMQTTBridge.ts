@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Buffer } from "buffer";
-import mqtt, { IClientPublishOptions, MqttClient } from "mqtt";
+import mqtt, { MqttClient } from "mqtt";
 
 const globalForBuffer = globalThis as typeof globalThis & {
   Buffer?: typeof Buffer;
@@ -12,15 +12,31 @@ if (!globalForBuffer.Buffer) {
   globalForBuffer.Buffer = Buffer;
 }
 
-type SubscriptionHandler = (topic: string, payload: Uint8Array) => void;
+export type MQTTStatus = "idle" | "connecting" | "connected" | "error";
 
-type MQTTStatus = "idle" | "connecting" | "connected" | "error";
+type PinMessageHandler = (message: PinMessage) => void;
 
-interface MQTTBridgeOptions {
-  defaultBrokerUrl?: string; // e.g. ws://localhost:9001/mqtt
+export interface MQTTMetadataPayload {
+  partNumber: string;
+  description: string;
+  pinCount: number;
+  category?: string;
 }
 
-interface MQTTMessage {
+export interface PinMessage {
+  pin: number;
+  level: 0 | 1;
+  topic: string;
+  rawPayload: string;
+}
+
+interface MQTTBridgeOptions {
+  defaultBrokerUrl?: string;
+  defaultBaseTopic?: string;
+  autoEnable?: boolean;
+}
+
+export interface MQTTMessageSummary {
   topic: string;
   payload: string;
   timestamp: number;
@@ -28,26 +44,52 @@ interface MQTTMessage {
 
 interface MQTTBridgeResult {
   brokerUrl: string;
-  setBrokerUrl: (value: string) => void;
+  setBrokerUrl: (url: string) => void;
+  baseTopic: string;
+  setBaseTopic: (value: string) => void;
   isEnabled: boolean;
   setEnabled: (value: boolean) => void;
   status: MQTTStatus;
   error: string | null;
-  lastMessage: MQTTMessage | null;
   clientId: string;
-  publish: (
-    topic: string,
-    payload: string | Uint8Array,
-    options?: IClientPublishOptions
-  ) => boolean;
-  replaceSubscriptions: (
-    topics: string[],
-    handler: SubscriptionHandler | null
-  ) => void;
+  lastMessage: MQTTMessageSummary | null;
+  publishMetadata: (icName: string, payload: MQTTMetadataPayload) => boolean;
+  publishPinLevel: (pin: number, level: 0 | 1) => boolean;
+  publishPinCollections: (inputs: number[], outputs: number[]) => boolean;
+  setPinMessageHandler: (handler: PinMessageHandler | null) => void;
 }
 
 const DEFAULT_BROKER =
   process.env.NEXT_PUBLIC_MQTT_WS_URL || "ws://98.93.38.49:9001/mqtt";
+const DEFAULT_BASE_TOPIC = "digitalkit/pins";
+
+const sanitizeTopicBase = (value: string) => {
+  const trimmed = (value ?? "").trim();
+  if (!trimmed) return DEFAULT_BASE_TOPIC;
+  return trimmed.replace(/\/{2,}/g, "/").replace(/^\/+|\/+$/g, "");
+};
+
+const slugifySegment = (value: string) => {
+  const safe = value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  return safe || "ic";
+};
+
+const normalizeIncomingLevel = (value: string): 0 | 1 | null => {
+  const normalized = value.trim().toLowerCase();
+  if (["1", "high", "true", "on"].includes(normalized)) return 1;
+  if (["0", "low", "false", "off"].includes(normalized)) return 0;
+  const parsed = Number(normalized);
+  if (!Number.isNaN(parsed)) return parsed ? 1 : 0;
+  return null;
+};
+
+const stringifyPayload = (payload: unknown) => {
+  if (typeof payload === "string") return payload;
+  return JSON.stringify(payload);
+};
 
 export const useMQTTBridge = (
   options?: MQTTBridgeOptions
@@ -55,20 +97,28 @@ export const useMQTTBridge = (
   const [brokerUrl, setBrokerUrl] = useState(
     options?.defaultBrokerUrl ?? DEFAULT_BROKER
   );
-  const [isEnabled, setEnabled] = useState(false);
+  const [baseTopic, setBaseTopicState] = useState(
+    sanitizeTopicBase(options?.defaultBaseTopic ?? DEFAULT_BASE_TOPIC)
+  );
+  const setBaseTopic = useCallback((value: string) => {
+    setBaseTopicState(sanitizeTopicBase(value));
+  }, []);
+
+  const [isEnabled, setEnabled] = useState(options?.autoEnable ?? true);
   const [status, setStatus] = useState<MQTTStatus>("idle");
   const [error, setError] = useState<string | null>(null);
-  const [lastMessage, setLastMessage] = useState<MQTTMessage | null>(null);
+  const [lastMessage, setLastMessage] = useState<MQTTMessageSummary | null>(
+    null
+  );
 
   const clientRef = useRef<MqttClient | null>(null);
-  const desiredTopicsRef = useRef<string[]>([]);
-  const activeTopicsRef = useRef<string[]>([]);
-  const handlerRef = useRef<SubscriptionHandler | null>(null);
-  const decoderRef = useRef<TextDecoder | null>(null);
-  const isMountedRef = useRef(true);
   const clientIdRef = useRef(
     `digitalkit-${Math.random().toString(16).slice(2, 10)}`
   );
+  const pinHandlerRef = useRef<PinMessageHandler | null>(null);
+  const pinSubscriptionRef = useRef<string | null>(null);
+  const decoderRef = useRef<TextDecoder | null>(null);
+  const isMountedRef = useRef(true);
 
   const decodePayload = useCallback((payload: Uint8Array | string) => {
     if (typeof payload === "string") return payload;
@@ -83,31 +133,11 @@ export const useMQTTBridge = (
     if (!client) return;
     try {
       client.end(true);
-    } catch (err) {
-      console.warn("MQTT cleanup error", err);
+    } catch (cleanupError) {
+      console.warn("[MQTT] cleanup error", cleanupError);
     }
     clientRef.current = null;
-    activeTopicsRef.current = [];
-  }, []);
-
-  const syncSubscriptions = useCallback(() => {
-    const client = clientRef.current;
-    if (!client || !client.connected) return;
-    const desired = desiredTopicsRef.current;
-    const active = activeTopicsRef.current;
-    const toUnsub = active.filter((topic) => !desired.includes(topic));
-    const toSub = desired.filter((topic) => !active.includes(topic));
-    if (toUnsub.length) {
-      client.unsubscribe(toUnsub, (err) => {
-        if (err) console.warn("MQTT unsubscribe error", err);
-      });
-    }
-    if (toSub.length) {
-      client.subscribe(toSub, (err) => {
-        if (err) console.warn("MQTT subscribe error", err);
-      });
-    }
-    activeTopicsRef.current = [...desired];
+    pinSubscriptionRef.current = null;
   }, []);
 
   useEffect(() => {
@@ -117,6 +147,38 @@ export const useMQTTBridge = (
     };
   }, [cleanupClient]);
 
+  const publishRetained = useCallback(
+    (topic: string, payload: string) => {
+      const client = clientRef.current;
+      if (!client || !client.connected) {
+        console.warn(`[MQTT] publish dropped ${topic} (disconnected)`);
+        return false;
+      }
+      client.publish(topic, payload, { qos: 1, retain: true });
+      console.info("[MQTT] ↑", topic, payload);
+      setLastMessage({ topic, payload, timestamp: Date.now() });
+      return true;
+    },
+    []
+  );
+
+  const subscribeToPins = useCallback(() => {
+    const client = clientRef.current;
+    if (!client || !client.connected) return;
+    const wildcard = `${baseTopic}/pin/+`;
+    const previous = pinSubscriptionRef.current;
+    if (previous && previous !== wildcard) {
+      client.unsubscribe(previous, (err) => {
+        if (err) console.warn("[MQTT] unsubscribe error", err);
+      });
+    }
+    pinSubscriptionRef.current = wildcard;
+    client.subscribe(wildcard, { qos: 1 }, (err) => {
+      if (err) console.warn("[MQTT] subscribe error", err);
+      else console.info("[MQTT] subscribed", wildcard);
+    });
+  }, [baseTopic]);
+
   useEffect(() => {
     if (!isEnabled) {
       cleanupClient();
@@ -125,6 +187,8 @@ export const useMQTTBridge = (
       return;
     }
     if (typeof window === "undefined") return;
+
+    console.info("[MQTT] connecting", brokerUrl);
     setStatus("connecting");
     setError(null);
 
@@ -138,34 +202,43 @@ export const useMQTTBridge = (
 
     const handleConnect = () => {
       if (!isMountedRef.current) return;
+      console.info("[MQTT] connected as", clientIdRef.current);
       setStatus("connected");
       setError(null);
-      syncSubscriptions();
+      subscribeToPins();
     };
 
     const handleReconnect = () => {
       if (!isMountedRef.current) return;
+      console.info("[MQTT] reconnecting");
       setStatus("connecting");
     };
 
     const handleClose = () => {
       if (!isMountedRef.current) return;
+      console.info("[MQTT] connection closed");
       setStatus(isEnabled ? "connecting" : "idle");
     };
 
-    const handleMessage = (topic: string, payload: Uint8Array) => {
+    const handleMessage = (topic: string, payload: Buffer) => {
       if (!isMountedRef.current) return;
-      const arrayPayload =
-        payload instanceof Uint8Array ? payload : new Uint8Array(payload);
-      const text = decodePayload(arrayPayload);
-      handlerRef.current?.(topic, arrayPayload);
+      const text = decodePayload(payload);
       setLastMessage({ topic, payload: text, timestamp: Date.now() });
+      if (!topic.startsWith(`${baseTopic}/pin/`)) return;
+      const pinSegment = topic.slice(`${baseTopic}/pin/`.length);
+      const pin = Number(pinSegment);
+      if (Number.isNaN(pin)) return;
+      const derived = normalizeIncomingLevel(text);
+      if (derived === null) return;
+      console.info("[MQTT] ↓ pin", pin, "<=", derived);
+      pinHandlerRef.current?.({ pin, level: derived, topic, rawPayload: text });
     };
 
-    const handleError = (mqttError: Error) => {
+    const handleError = (incomingError: Error) => {
       if (!isMountedRef.current) return;
+      console.error("[MQTT] client error", incomingError);
       setStatus("error");
-      setError(mqttError.message);
+      setError(incomingError.message);
     };
 
     client.on("connect", handleConnect);
@@ -185,50 +258,74 @@ export const useMQTTBridge = (
         setStatus("idle");
       }
     };
-  }, [brokerUrl, cleanupClient, decodePayload, isEnabled, syncSubscriptions]);
+  }, [brokerUrl, cleanupClient, decodePayload, isEnabled, subscribeToPins]);
 
-  const replaceSubscriptions = useCallback(
-    (topics: string[], handler: SubscriptionHandler | null) => {
-      desiredTopicsRef.current = topics;
-      handlerRef.current = handler;
-      syncSubscriptions();
+  useEffect(() => {
+    if (status !== "connected") return;
+    subscribeToPins();
+  }, [status, subscribeToPins]);
+
+  const publishMetadata = useCallback(
+    (icName: string, payload: MQTTMetadataPayload) => {
+      const slug = slugifySegment(icName || "ic");
+      const topic = `${baseTopic}/${slug}`;
+      const enriched = {
+        ...payload,
+        icName,
+        slug,
+        publishedAt: Date.now(),
+      };
+      return publishRetained(topic, stringifyPayload(enriched));
     },
-    [syncSubscriptions]
+    [baseTopic, publishRetained]
   );
 
-  const publish = useCallback(
-    (
-      topic: string,
-      payload: string | Uint8Array,
-      options?: IClientPublishOptions
-    ) => {
-      const client = clientRef.current;
-      if (!client || !client.connected || !topic) return false;
-      const message =
-        typeof payload === "string"
-          ? payload
-          : Buffer.from(payload instanceof Uint8Array ? payload : new Uint8Array(payload));
-      client.publish(topic, message, options ?? {});
-      setLastMessage({
-        topic,
-        payload: typeof payload === "string" ? payload : decodePayload(payload),
-        timestamp: Date.now(),
-      });
-      return true;
+  const publishPinLevel = useCallback(
+    (pin: number, level: 0 | 1) => {
+      if (!Number.isFinite(pin)) return false;
+      const topic = `${baseTopic}/pin/${pin}`;
+      return publishRetained(topic, `${level}`);
     },
-    [decodePayload]
+    [baseTopic, publishRetained]
   );
+
+  const publishPinCollections = useCallback(
+    (inputs: number[], outputs: number[]) => {
+      const inputTopic = `${baseTopic}/inputs`;
+      const outputTopic = `${baseTopic}/outputs`;
+      const nextInputs = [...new Set(inputs)].sort((a, b) => a - b);
+      const nextOutputs = [...new Set(outputs)].sort((a, b) => a - b);
+      const inputsResult = publishRetained(
+        inputTopic,
+        stringifyPayload(nextInputs)
+      );
+      const outputsResult = publishRetained(
+        outputTopic,
+        stringifyPayload(nextOutputs)
+      );
+      return inputsResult && outputsResult;
+    },
+    [baseTopic, publishRetained]
+  );
+
+  const setPinMessageHandler = useCallback((handler: PinMessageHandler | null) => {
+    pinHandlerRef.current = handler;
+  }, []);
 
   return {
     brokerUrl,
     setBrokerUrl,
+    baseTopic,
+    setBaseTopic,
     isEnabled,
     setEnabled,
     status,
     error,
-    lastMessage,
     clientId: clientIdRef.current,
-    publish,
-    replaceSubscriptions,
+    lastMessage,
+    publishMetadata,
+    publishPinLevel,
+    publishPinCollections,
+    setPinMessageHandler,
   };
 };
