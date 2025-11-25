@@ -1,11 +1,9 @@
-import { NextRequest } from "next/server";
-
 const BACKEND_URL =
   process.env.BACKEND_API_URL || "http://localhost:3001";
 
 export const runtime = "nodejs";
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   console.log("[Proxy] SSE /events connection initiated");
 
   const encoder = new TextEncoder();

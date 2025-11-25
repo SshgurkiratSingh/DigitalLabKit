@@ -251,7 +251,7 @@ export const useAPIBridge = (
           "messages"
         );
 
-        data.messages.forEach((msg: any) => {
+        data.messages.forEach((msg: { event: string; data: { pin?: number; level?: number | string; topic: string; payload: string } }) => {
           if (msg.event === "pin" && msg.data.pin && msg.data.level !== undefined) {
             const normalizedLevel = normalizeIncomingLevel(
               String(msg.data.level)

@@ -139,7 +139,8 @@ The proxy mode is recommended for production as it keeps backend URLs server-sid
 The backend connects to an MQTT broker. Configure in `/backend/server.js`:
 
 ```javascript
-const MQTT_BROKER_URL = process.env.MQTT_BROKER_URL || "ws://98.93.38.49:9001/mqtt";
+const MQTT_BROKER_URL =
+  process.env.MQTT_BROKER_URL || "ws://98.93.38.49:9001/mqtt";
 ```
 
 Default topics: `digitalkit/pins/*`
@@ -172,7 +173,7 @@ Default topics: `digitalkit/pins/*`
 # Terminal 1: Backend
 cd backend && npm start
 
-# Terminal 2: Frontend  
+# Terminal 2: Frontend
 cd FrontEnd/digitalkit && npm run dev
 
 # Terminal 3: Test endpoints

@@ -62,7 +62,16 @@ export default function MonitorPage() {
 
   // Handle incoming pin messages from SSE and polling
   useEffect(() => {
-    const handler = ({ pin, level, topic }: any) => {
+    const handler = ({
+      pin,
+      level,
+      topic,
+    }: {
+      pin: number;
+      level: 0 | 1;
+      topic: string;
+      rawPayload: string;
+    }) => {
       console.log("[Monitor] Pin handler called:", pin, "=>", level);
       setPinStates((prev) => {
         const newMap = new Map(prev);
@@ -97,56 +106,69 @@ export default function MonitorPage() {
         console.log("[Monitor] Fetched messages:", data.messages?.length || 0);
 
         if (data.messages) {
-          data.messages.forEach((msg: any) => {
-            console.log(
-              "[Monitor] Processing message:",
-              msg.event,
-              msg.data.topic
-            );
+          data.messages.forEach(
+            (msg: {
+              event: string;
+              data: {
+                topic: string;
+                payload: string;
+                pin?: number;
+                level?: number | string;
+              };
+            }) => {
+              console.log(
+                "[Monitor] Processing message:",
+                msg.event,
+                msg.data.topic
+              );
 
-            if (msg.event === "metadata" && msg.data.payload) {
-              try {
-                const parsed = JSON.parse(msg.data.payload);
-                console.log("[Monitor] Setting metadata:", parsed);
-                setMetadata(parsed);
-              } catch (e) {
-                console.error("Failed to parse metadata", e);
-              }
-            } else if (msg.event === "collections") {
-              if (msg.data.topic.includes("/inputs")) {
+              if (msg.event === "metadata" && msg.data.payload) {
                 try {
-                  const pins = JSON.parse(msg.data.payload);
-                  console.log("[Monitor] Setting input pins:", pins);
-                  setInputPins(pins);
-                } catch (e) {}
-              } else if (msg.data.topic.includes("/outputs")) {
-                try {
-                  const pins = JSON.parse(msg.data.payload);
-                  console.log("[Monitor] Setting output pins:", pins);
-                  setOutputPins(pins);
-                } catch (e) {}
-              }
-            } else if (msg.event === "pin" && msg.data.pin !== undefined) {
-              // Handle pin state updates from polling
-              const level =
-                msg.data.level !== undefined
-                  ? msg.data.level
-                  : msg.data.payload === "1" || msg.data.payload === "HIGH"
-                  ? 1
-                  : 0;
-              console.log("[Monitor] Pin update:", msg.data.pin, "=>", level);
-              setPinStates((prev) => {
-                const newMap = new Map(prev);
-                newMap.set(msg.data.pin, {
-                  pin: msg.data.pin,
-                  level,
-                  lastUpdate: msg.data.timestamp || Date.now(),
-                  source: msg.data.topic,
+                  const parsed = JSON.parse(msg.data.payload);
+                  console.log("[Monitor] Setting metadata:", parsed);
+                  setMetadata(parsed);
+                } catch (e) {
+                  console.error("Failed to parse metadata", e);
+                }
+              } else if (msg.event === "collections") {
+                if (msg.data.topic.includes("/inputs")) {
+                  try {
+                    const pins = JSON.parse(msg.data.payload);
+                    console.log("[Monitor] Setting input pins:", pins);
+                    setInputPins(pins);
+                  } catch {}
+                } else if (msg.data.topic.includes("/outputs")) {
+                  try {
+                    const pins = JSON.parse(msg.data.payload);
+                    console.log("[Monitor] Setting output pins:", pins);
+                    setOutputPins(pins);
+                  } catch {}
+                }
+              } else if (msg.event === "pin" && msg.data.pin !== undefined) {
+                // Handle pin state updates from polling
+                const pin = msg.data.pin;
+                const level: 0 | 1 =
+                  msg.data.level !== undefined
+                    ? typeof msg.data.level === "number"
+                      ? (msg.data.level as 0 | 1)
+                      : (Number(msg.data.level) as 0 | 1)
+                    : msg.data.payload === "1" || msg.data.payload === "HIGH"
+                    ? 1
+                    : 0;
+                console.log("[Monitor] Pin update:", pin, "=>", level);
+                setPinStates((prev) => {
+                  const newMap = new Map(prev);
+                  newMap.set(pin, {
+                    pin: pin,
+                    level,
+                    lastUpdate: Date.now(),
+                    source: msg.data.topic,
+                  });
+                  return newMap;
                 });
-                return newMap;
-              });
+              }
             }
-          });
+          );
         }
       } catch (err) {
         console.error("Failed to fetch initial data", err);

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useState, useCallback, useRef } from "react";
 
 interface TestScriptPanelProps {
   inputPins: number[];
@@ -111,7 +111,8 @@ pin3 = 1;
         if (repeatStack.length === 0) {
           throw new Error(`Line ${lineNumber}: Unmatched closing brace`);
         }
-        const repeatInfo = repeatStack.pop()!;
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const _repeatInfo = repeatStack.pop()!;
         commands.push({
           type: "repeat_end",
           lineNumber,
@@ -287,7 +288,7 @@ repeat(5) {
       setScriptCode(exampleScripts[example]);
       clearLogs();
     },
-    [clearLogs]
+    [clearLogs, exampleScripts]
   );
 
   if (collapsed) {
